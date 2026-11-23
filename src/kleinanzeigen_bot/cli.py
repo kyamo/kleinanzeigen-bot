@@ -60,6 +60,9 @@ class ParsedArgs:
     log_file_path:str | None = None
     logfile_explicitly_provided:bool = False
     workspace_mode:str | None = None
+    web_host:str | None = None
+    web_port:int | None = None
+    open_browser:bool = False
 
 
 def _restore_library_path_for_subprocesses() -> None:
@@ -164,6 +167,7 @@ def help_text(*, executable:str | None = None, language:str | None = None) -> st
               diagnose - Diagnostiziert Browser-Verbindungsprobleme und zeigt Troubleshooting-Informationen
               status   - Zeigt Anzeigenstatus und APR-Vorschau an
               list     - Zeigt aktuelle Online-Anzeigen mit ID, Titel, Status und Ablaufdatum an
+              web      - Startet die Weboberfläche (STANDARD: http://localhost:8090)
               --
               help     - Zeigt diese Hilfe an (Standardbefehl)
               version  - Zeigt die Version der Anwendung an
@@ -210,6 +214,9 @@ def help_text(*, executable:str | None = None, language:str | None = None) -> st
               --config=<PATH>   - Pfad zur YAML- oder JSON-Konfigurationsdatei (ändert den Workspace-Modus nicht implizit)
               --workspace-mode=portable|xdg - Überschreibt den Workspace-Modus für diesen Lauf
               --logfile=<PATH>  - Pfad zur Protokolldatei (STANDARD: vom aktiven Workspace-Modus abhängig)
+              --host=<HOST>     - (web) Adresse, an die die Weboberfläche gebunden wird (STANDARD: 127.0.0.1)
+              --port=<PORT>     - (web) Port der Weboberfläche (STANDARD: 8090)
+              --open            - (web) Öffnet die Weboberfläche im Standardbrowser
               --lang=en|de      - Anzeigesprache (STANDARD: Systemsprache, wenn unterstützt, sonst Englisch)
               -v, --verbose     - Aktiviert detaillierte Ausgabe – nur nützlich zur Fehlerbehebung
             """.rstrip()
@@ -236,6 +243,7 @@ def help_text(*, executable:str | None = None, language:str | None = None) -> st
           diagnose - diagnoses browser connection issues and shows troubleshooting information
           status   - shows ad status and APR preview details
           list     - lists current online ads with ID, title, state, and expiry date
+          web      - starts the web interface (DEFAULT: http://localhost:8090)
           --
           help     - displays this help (default command)
           version  - displays the application version
@@ -281,6 +289,9 @@ def help_text(*, executable:str | None = None, language:str | None = None) -> st
           --config=<PATH>   - path to the config YAML or JSON file (does not implicitly change workspace mode)
           --workspace-mode=portable|xdg - overrides workspace mode for this run
           --logfile=<PATH>  - path to the logfile (DEFAULT: depends on active workspace mode)
+          --host=<HOST>     - (web) address the web interface binds to (DEFAULT: 127.0.0.1)
+          --port=<PORT>     - (web) port of the web interface (DEFAULT: 8090)
+          --open            - (web) opens the web interface in the default browser
           --lang=en|de      - display language (STANDARD: system language if supported, otherwise English)
           -v, --verbose     - enables verbose output - only useful when troubleshooting issues
         """.rstrip()
@@ -298,7 +309,10 @@ def parse_args(args:Sequence[str]) -> ParsedArgs:
         options, arguments = getopt.gnu_getopt(
             list(args)[1:],
             "hv",
-            ["ads=", "config=", "force", "help", "keep-old", "logfile=", "lang=", "preserve-local-settings", "verbose", "workspace-mode="],
+            [
+                "ads=", "config=", "force", "help", "host=", "keep-old", "logfile=", "lang=", "open", "port=",
+                "preserve-local-settings", "verbose", "workspace-mode=",
+            ],
         )
     except getopt.error as ex:
         LOG.error(ex.msg)
@@ -328,6 +342,15 @@ def parse_args(args:Sequence[str]) -> ParsedArgs:
             case "--force":
                 parsed.ads_selector = "all"
                 parsed.ads_selector_explicit = True
+            case "--host":
+                parsed.web_host = value.strip()
+            case "--port":
+                if not value.strip().isdigit() or not 0 < int(value) < 65536:  # noqa: PLR2004 valid TCP port range
+                    LOG.error("Invalid --port '%s'. Use a number between 1 and 65535.", value)
+                    sys.exit(2)
+                parsed.web_port = int(value)
+            case "--open":
+                parsed.open_browser = True
             case "--keep-old":
                 parsed.keep_old_ads = True
             case "--preserve-local-settings":

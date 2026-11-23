@@ -36,6 +36,7 @@
 - **Extend Listings**: Extend ads close to expiry to keep watchers/savers and preserve the monthly ad quota
 - **Browser Automation**: Uses Chromium-based browsers (Chrome, Edge, Chromium) for reliable automation
 - **Flexible Configuration**: Configure defaults once, override per listing as needed
+- **Web Interface**: Manage ads, edit configuration and run all commands from a local browser UI (`kleinanzeigen-bot web`)
 
 ### ⚠️ Legal Disclaimer
 
@@ -141,6 +142,31 @@ Without a GPU (VPS, Docker Desktop on Windows/macOS, NVIDIA's proprietary driver
 The startup log states which mode is used.
 
 To sign in manually (CAPTCHA, SMS verification), run the container with the `login` command and `-it`; see [Manual login](docs/BROWSER_TROUBLESHOOTING.md#manual-login-and-sms-device-verification).
+
+**Web interface in Docker:**
+
+The image also runs the [web interface](#web-ui). The included `docker-compose.yml` builds the image from source and
+keeps the web interface running in the background:
+
+```bash
+GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
+```
+
+(`GIT_COMMIT_HASH` only sets the version shown by the bot; without it the version is `<year>+local`.)
+
+- Web interface: <http://localhost:8090>
+- Browser desktop: <http://localhost:6080> (login `user`, password in `./data/.vnc-password`). Commands started from the web
+  interface open the bot's browser on this desktop, so you can watch them and solve a CAPTCHA or SMS verification there.
+- Config, ads and the browser profile are stored in `./data`; `config.yaml` is created on the first start and can be edited
+  in the web interface.
+- For a manual login run `docker compose exec -it kleinanzeigen-bot /opt/kleinanzeigen-bot --config /mnt/data/config.yaml login`.
+
+Without Compose: `docker build -f docker/image/Dockerfile --build-arg GIT_COMMIT_HASH=$(git rev-parse --short HEAD) -t kleinanzeigen-bot .` and
+`docker run -d --init --shm-size=1g -p 127.0.0.1:8090:8090 -p 127.0.0.1:6080:6080 -v $DATA_DIR:/mnt/data kleinanzeigen-bot web --host=0.0.0.0`.
+
+> [!WARNING]
+> Inside the container the web interface has to listen on `0.0.0.0`. Publish the port on `127.0.0.1` only, as shown above:
+> the web interface has no login and shows your configuration including credentials.
 
 ### Installation from source
 
@@ -255,6 +281,7 @@ Commands:
   diagnose - diagnoses browser connection issues and shows troubleshooting information
   status   - shows ad status and APR preview details
   list     - lists current online ads with ID, title, state, and expiry date
+  web      - starts the web interface (DEFAULT: http://localhost:8090)
   --
   help     - displays this help (default command)
   version  - displays the application version
@@ -300,6 +327,9 @@ Options:
   --config=<PATH>   - path to the config YAML or JSON file (does not implicitly change workspace mode)
   --workspace-mode=portable|xdg - overrides workspace mode for this run
   --logfile=<PATH>  - path to the logfile (DEFAULT: depends on active workspace mode)
+  --host=<HOST>     - (web) address the web interface binds to (DEFAULT: 127.0.0.1)
+  --port=<PORT>     - (web) port of the web interface (DEFAULT: 8090)
+  --open            - (web) opens the web interface in the default browser
   --lang=en|de      - display language (STANDARD: system language if supported, otherwise English)
   -v, --verbose     - enables verbose output - only useful when troubleshooting issues
 ```
@@ -320,6 +350,26 @@ online. Successful batches and batches containing only skipped ads exit with sta
 > **Note:** The output of `kleinanzeigen-bot help` is always the most up-to-date reference for available commands and options.
 
 Shipping inference during `download`: the bot reads the public ad shipping state. Pickup becomes `PICKUP`; `Versand möglich` without a price becomes `SHIPPING` without costs/options. Visible "shipping from" prices are kept as deprecated `shipping_costs` metadata and, when they match a current gateway option, infer one [`shipping_options`](docs/AD_CONFIGURATION.md#shipping-options-reference) entry by default. Set `download.include_all_matching_shipping_options: true` to include all non-excluded options with the same package size. `sell_directly` is resolved only for current-profile ads from cached manage-ads data.
+
+### <a name="web-ui"></a>Web interface
+
+`kleinanzeigen-bot web` starts a local web interface (default: <http://localhost:8090>) that works on the same
+config and ad files as the CLI:
+
+- **Ads**: card overview of all local ads with images, price, status (new / changed / due / online / disabled),
+  search, filters and sorting; edit the YAML of an ad with validation, enable/disable ads, and select published ads
+  to publish, update, extend, reserve, re-activate or delete them
+- **New ad**: form with category auto-completion that creates `ads/<title>/ad_<title>.yaml` next to the config
+- **Actions & log**: run any bot command (`verify`, `publish`, `update`, `download`, `extend`, …) with live log output,
+  cancel it and see the history of recent runs
+- **Configuration**: edit `config.yaml` with schema validation before saving
+
+Options: `--host=<HOST>` (default `127.0.0.1`), `--port=<PORT>` (default `8090`), `--open` (opens the default browser).
+The UI is available in German and English (browser language, or `?lang=de` / `?lang=en`).
+
+> **Security:** the web interface has no login and shows your configuration including credentials. Keep the default
+> `127.0.0.1` binding unless the host is in a trusted network. `login` needs an interactive terminal and is therefore only
+> available from the CLI.
 
 ## <a name="config"></a>Configuration
 

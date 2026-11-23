@@ -1,0 +1,34 @@
+# Build context filter for docker/image/Dockerfile (BuildKit uses <Dockerfile>.dockerignore automatically,
+# e.g. for 'docker compose build'). Keep in sync with .gitignore, which docker/build-image.sh uses as .dockerignore.
+
+# Local work folder that is not checked in
+_LOCAL/
+
+.*
+!.act-event.json
+!.actrc
+!.gitattribute
+!.gitignore
+!.github/
+!.markdownlint-cli2.jsonc
+
+# kleinanzeigen_bot
+/config.yaml
+/data
+/*.log
+/src/kleinanzeigen_bot/_version.py
+downloaded-ads
+
+# python
+__pycache__
+__pypackages__
+/dist
+
+# IntelliJ
+/*.iml
+/*.ipr
+/*.iws
+
+# Vim
+*.swo
+*.swp

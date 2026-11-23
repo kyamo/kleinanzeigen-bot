@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: © Sebastian Thomschke and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-ArtifactOfProjectHomePage: https://github.com/Second-Hand-Friends/kleinanzeigen-bot/
+#
+# Runs the web interface in the Docker image.
+#
+#   GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
+#
+# Web interface:   http://localhost:8090
+# Browser desktop: http://localhost:6080 (user "user", password in ./data/.vnc-password)
+#                  shows the bot's browser, e.g. to solve a CAPTCHA or confirm an SMS code
+#
+# Config, ads and browser profile are stored in ./data (config.yaml is created on first start).
+# Both ports are only published on 127.0.0.1: the web interface has no login and shows your credentials.
+services:
+  kleinanzeigen-bot:
+    build:
+      context: .
+      dockerfile: docker/image/Dockerfile
+      args:
+        # the build context excludes .git, so the version needs the commit hash from outside:
+        #   GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
+        GIT_COMMIT_HASH: ${GIT_COMMIT_HASH:-local}
+    image: kleinanzeigen-bot:local
+    command: [web, --host=0.0.0.0, --port=8090]
+    init: true
+    shm_size: 1g
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:8090:8090
+      - 127.0.0.1:6080:6080
+    volumes:
+      - ./data:/mnt/data
+    environment:
+      TZ: Europe/Berlin
+      LANG: de_DE.UTF-8
+      # VNC_PASSWORD: choose-a-strong-password

@@ -157,6 +157,8 @@ class KleinanzeigenBot(WebScrapingMixin):  # noqa: PLR0904
                     await self._handle_reserve_or_activate("activate")
                 case "download":
                     await self._handle_download()
+                case "web":
+                    self._handle_web(parsed)
                 case _:
                     LOG.error("Unknown command: %s", self.command)
                     sys.exit(2)
@@ -247,6 +249,21 @@ class KleinanzeigenBot(WebScrapingMixin):  # noqa: PLR0904
             LOG.info("############################################")
             LOG.info("DONE: No active ads found.")
             LOG.info("############################################")
+
+    def _handle_web(self, parsed:Any) -> None:
+        """Serve the local web interface until interrupted."""
+        from . import web_ui as _web_ui  # noqa: PLC0415 only needed for this command
+
+        if not os.path.exists(self.config_file_path):
+            _runtime_config.create_default_config(self.config_file_path, self.workspace)
+        _web_ui.serve(
+            config_file_path = self.config_file_path,
+            workspace = self.workspace,
+            version = self.get_version(),
+            host = parsed.web_host or _web_ui.DEFAULT_HOST,
+            port = parsed.web_port or _web_ui.DEFAULT_PORT,
+            open_browser = parsed.open_browser,
+        )
 
     def _handle_status(self) -> None:
         """Show status overview of all local ads."""

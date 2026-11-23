@@ -1,0 +1,750 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: © Sebastian Thomschke and contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+SPDX-ArtifactOfProjectHomePage: https://github.com/Second-Hand-Friends/kleinanzeigen-bot/
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kleinanzeigen-bot</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #f4f6f3; --surface: #ffffff; --surface-2: #f0f3ef; --border: #dde3dc; --text: #1c2420; --muted: #66726b;
+  --accent: #2f7d4f; --accent-hover: #256840; --accent-soft: #e1f0e6; --danger: #b93a32; --danger-soft: #fbe6e4;
+  --warn: #a86500; --warn-soft: #fdf0d9; --info: #2b62a8; --info-soft: #e3ecf8; --neutral-soft: #eceeec;
+  --shadow: 0 1px 2px rgba(20,30,25,.06), 0 4px 14px rgba(20,30,25,.06); --radius: 12px; --on-accent: #ffffff;
+  --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111613; --surface: #19201c; --surface-2: #202924; --border: #2c3731; --text: #e5ece7; --muted: #95a39a;
+    --accent: #4fb37a; --accent-hover: #63c58c; --accent-soft: #1d3a29; --danger: #e86a61; --danger-soft: #3d1f1d;
+    --warn: #e5a443; --warn-soft: #3a2c14; --info: #6aa0e8; --info-soft: #1b2b40; --neutral-soft: #262e2a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25); --on-accent: #0b1a11; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.bar { max-width: 1240px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 20px; min-height: 60px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; white-space: nowrap; }
+.brand img { width: 28px; height: 28px; }
+.brand small { font-weight: 500; color: var(--muted); font-size: 12px; }
+nav { display: flex; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+nav button { background: none; border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; white-space: nowrap; }
+nav button:hover { background: var(--surface-2); color: var(--text); }
+nav button.active { background: var(--accent-soft); color: var(--accent); }
+.job-indicator { display: none; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.job-indicator.on { display: flex; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+main { max-width: 1240px; margin: 0 auto; padding: 24px 20px 60px; }
+.view { display: none; } .view.active { display: block; }
+h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 17px; margin: 0 0 12px; }
+.sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; word-break: break-all; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.pad { padding: 20px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.danger { color: var(--danger); } .btn.danger:hover { background: var(--danger-soft); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { padding: 14px 16px; cursor: pointer; transition: border-color .15s; }
+.stat:hover, .stat.sel { border-color: var(--accent); }
+.stat .n { font-size: 26px; font-weight: 700; line-height: 1.2; }
+.stat .l { color: var(--muted); font-size: 13px; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.toolbar input[type=search] { flex: 1; min-width: 200px; }
+input[type=text], input[type=search], input[type=number], select, textarea { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.toolbar select, .toolbar input[type=search] { width: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.ad { display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.ad.inactive { opacity: .62; }
+.ad .thumb { aspect-ratio: 16/10; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--muted); position: relative; }
+.ad .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ad .thumb .count { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; padding: 1px 8px; border-radius: 99px; }
+.ad .check { position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; accent-color: var(--accent); z-index: 2; cursor: pointer; }
+.ad .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.ad .title { font-weight: 650; line-height: 1.35; }
+.ad .price { font-size: 18px; font-weight: 700; color: var(--accent); }
+.ad .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 10px; flex-wrap: wrap; }
+.ad .problem { color: var(--danger); font-size: 12.5px; background: var(--danger-soft); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
+.ad .meta.path { overflow-wrap: anywhere; font-family: var(--mono); font-size: 11.5px; }
+.ad .actions { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 16px 14px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 99px; background: var(--neutral-soft); color: var(--muted); }
+.badge.published-local { background: var(--accent-soft); color: var(--accent); }
+.badge.draft { background: var(--info-soft); color: var(--info); }
+.badge.changed { background: var(--warn-soft); color: var(--warn); }
+.badge.due { background: var(--warn-soft); color: var(--warn); }
+.badge.disabled { background: var(--neutral-soft); color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.errors { margin-bottom: 16px; border-color: var(--danger); }
+.errors pre { margin: 6px 0 0; white-space: pre-wrap; font: 12.5px/1.45 var(--mono); color: var(--danger); }
+.form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form .full { grid-column: 1 / -1; }
+.form label { display: block; font-weight: 600; font-size: 13.5px; margin-bottom: 5px; }
+.form .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+textarea { resize: vertical; min-height: 120px; }
+textarea.code { font: 13px/1.5 var(--mono); min-height: 420px; tab-size: 2; white-space: pre; }
+.switch { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.switch input { width: 18px; height: 18px; accent-color: var(--accent); }
+.cmds { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.cmd { text-align: left; padding: 12px 14px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.cmd:hover { border-color: var(--accent); }
+.cmd b { display: block; font-size: 14px; } .cmd span { color: var(--muted); font-size: 12.5px; }
+.console { background: #0f1512; color: #d6e2da; font: 12.5px/1.55 var(--mono); padding: 14px 16px; border-radius: 10px; height: 460px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.console .err { color: #ff8b82; } .console .warn { color: #f3c26b; } .console .cmdline { color: #7fd6a2; font-weight: 700; }
+.split { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+.history { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.history li { padding: 7px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+.ok { color: var(--accent); font-weight: 700; } .fail { color: var(--danger); font-weight: 700; }
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 0; width: min(900px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(10,15,12,.5); }
+dialog .head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+dialog .content { padding: 16px 20px; }
+dialog .foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.msg { white-space: pre-wrap; font: 12.5px/1.45 var(--mono); color: var(--danger); margin-top: 10px; }
+.msg.good { color: var(--accent); }
+.ps-head { display: flex; gap: 8px; margin-bottom: 14px; }
+.ps-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ps-summary .card { padding: 12px 14px; box-shadow: none; }
+.ps-summary .n { font-size: 22px; font-weight: 700; }
+.ps-summary .main { border-color: var(--accent); background: var(--accent-soft); }
+.ps-summary .main .n { color: var(--accent); }
+.ps-summary .l { color: var(--muted); font-size: 12.5px; }
+.ps-bar { position: relative; height: 34px; margin: 6px 4px 18px; }
+.ps-bar .track { position: absolute; top: 15px; left: 0; right: 0; height: 4px; background: var(--border); border-radius: 2px; }
+.ps-bar .iqr { position: absolute; top: 11px; height: 12px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 4px; }
+.ps-bar .dot { position: absolute; top: 13px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--muted); opacity: .55; }
+.ps-bar .med { position: absolute; top: 4px; width: 3px; height: 26px; margin-left: -1px; background: var(--accent); border-radius: 2px; }
+.ps-bar .lbl { position: absolute; top: 34px; font-size: 11.5px; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+.ps-list { list-style: none; margin: 0; padding: 0; max-height: 34vh; overflow: auto; border-top: 1px solid var(--border); }
+.ps-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.ps-list li.unused { opacity: .45; }
+.ps-list a { color: inherit; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-list a:hover { color: var(--accent); text-decoration: underline; }
+.ps-list b { white-space: nowrap; }
+.ps-note { color: var(--muted); font-size: 12.5px; margin: 10px 0 0; }
+.price-row { display: flex; gap: 8px; } .price-row input { flex: 1; }
+.ps-inline { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+#toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.toast { background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow); max-width: 380px; font-size: 14px; }
+.toast.error { background: var(--danger); color: #fff; }
+.selbar { display: none; position: sticky; top: 72px; z-index: 5; margin-bottom: 16px; padding: 10px 16px; align-items: center; gap: 10px; flex-wrap: wrap; border-color: var(--accent); }
+.selbar.on { display: flex; }
+@media (max-width: 700px) { nav { order: 3; flex-basis: 100%; padding-bottom: 8px; } .bar { gap: 8px; padding-top: 8px; } .selbar { top: 112px; } }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } .form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><img src="/favicon.svg" alt=""><span>kleinanzeigen-bot <small id="version"></small></span></div>
+    <nav>
+      <button data-view="ads" class="active" data-i18n="nav.ads">Anzeigen</button>
+      <button data-view="new" data-i18n="nav.new">Neue Anzeige</button>
+      <button data-view="jobs" data-i18n="nav.jobs">Aktionen &amp; Protokoll</button>
+      <button data-view="config" data-i18n="nav.config">Konfiguration</button>
+    </nav>
+    <div class="job-indicator" id="jobIndicator"><div class="spinner"></div><span id="jobIndicatorText"></span></div>
+  </div>
+</header>
+<main>
+  <!-- Ads -->
+  <section class="view active" id="view-ads">
+    <div class="row" style="margin-bottom:16px;align-items:flex-start;flex-wrap:wrap">
+      <div><h1 data-i18n="ads.title">Meine Anzeigen</h1><p class="sub" id="configPath"></p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="reloadAds" data-i18n="ads.reload">↻ Neu laden</button>
+        <button class="btn" data-run="verify" data-i18n="ads.verify">Prüfen</button>
+        <button class="btn primary" data-run="publish" data-ads="due" data-i18n="ads.publishDue">Neue &amp; fällige veröffentlichen</button>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="card pad errors" id="adErrors" hidden></div>
+    <div class="card selbar" id="selbar">
+      <b id="selCount"></b>
+      <button class="btn small" data-sel="publish" data-i18n="sel.publish">Veröffentlichen</button>
+      <button class="btn small" data-sel="update" data-i18n="sel.update">Aktualisieren</button>
+      <button class="btn small" data-sel="extend" data-i18n="sel.extend">Verlängern</button>
+      <button class="btn small" data-sel="reserve" data-i18n="sel.reserve">Reservieren</button>
+      <button class="btn small" data-sel="activate" data-i18n="sel.activate">Reaktivieren</button>
+      <button class="btn small danger" data-sel="delete" data-i18n="sel.delete">Online löschen</button>
+      <span style="flex:1"></span>
+      <button class="btn small" id="selClear" data-i18n="sel.clear">Auswahl aufheben</button>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" data-i18n-placeholder="ads.search" placeholder="Suchen nach Titel, Kategorie, ID …">
+      <select id="sort">
+        <option value="title" data-i18n="sort.title">Titel A–Z</option>
+        <option value="price-desc" data-i18n="sort.priceDesc">Preis absteigend</option>
+        <option value="price-asc" data-i18n="sort.priceAsc">Preis aufsteigend</option>
+        <option value="updated" data-i18n="sort.updated">Zuletzt aktualisiert</option>
+      </select>
+    </div>
+    <div class="grid" id="adGrid"></div>
+  </section>
+
+  <!-- New ad -->
+  <section class="view" id="view-new">
+    <h1 data-i18n="new.title">Neue Anzeige anlegen</h1>
+    <p class="sub" data-i18n="new.sub">Die Anzeige wird als YAML-Datei unter „ads/“ neben deiner Konfiguration gespeichert. Weitere Felder kannst du danach im Editor ergänzen.</p>
+    <form class="card pad form" id="newForm" autocomplete="off">
+      <div class="full"><label for="f-title" data-i18n="f.title">Titel</label><input type="text" id="f-title" name="title" required minlength="10" maxlength="65"><div class="hint" data-i18n="f.titleHint">10–65 Zeichen</div></div>
+      <div class="full"><label for="f-description" data-i18n="f.description">Beschreibung</label><textarea id="f-description" name="description" rows="7" required></textarea></div>
+      <div><label for="f-price" data-i18n="f.price">Preis (€)</label><div class="price-row"><input type="number" id="f-price" name="price" min="0" step="1"><button class="btn" type="button" id="f-suggest" data-i18n="ps.button">Preisvorschlag</button></div><div class="ps-inline" id="f-suggest-info"></div></div>
+      <div><label for="f-price_type" data-i18n="f.priceType">Preisart</label>
+        <select id="f-price_type" name="price_type">
+          <option value="" data-i18n="f.default">Standard aus Konfiguration</option>
+          <option value="FIXED" data-i18n="pt.FIXED">Festpreis</option>
+          <option value="NEGOTIABLE" data-i18n="pt.NEGOTIABLE">Verhandlungsbasis</option>
+          <option value="GIVE_AWAY" data-i18n="pt.GIVE_AWAY">Zu verschenken</option>
+          <option value="NOT_APPLICABLE" data-i18n="pt.NOT_APPLICABLE">Keine Angabe</option>
+        </select></div>
+      <div><label for="f-category" data-i18n="f.category">Kategorie</label><input type="text" id="f-category" name="category" list="categoryList" required><datalist id="categoryList"></datalist><div class="hint" data-i18n="f.categoryHint">Name aus der Liste oder ID, z. B. 161/176/sonstige</div></div>
+      <div><label for="f-shipping_type" data-i18n="f.shipping">Versand</label>
+        <select id="f-shipping_type" name="shipping_type">
+          <option value="" data-i18n="f.default">Standard aus Konfiguration</option>
+          <option value="PICKUP" data-i18n="st.PICKUP">Nur Abholung</option>
+          <option value="SHIPPING" data-i18n="st.SHIPPING">Versand möglich</option>
+          <option value="NOT_APPLICABLE" data-i18n="st.NOT_APPLICABLE">Keine Angabe</option>
+        </select></div>
+      <div class="full"><label for="f-images" data-i18n="f.images">Bilder (ein Pfad oder Muster pro Zeile)</label><textarea id="f-images" name="images" rows="3" style="min-height:70px" placeholder="*.jpg"></textarea><div class="hint" data-i18n="f.imagesHint">Relativ zum Ordner der Anzeige, z. B. „*.jpg“ – lege die Bilder einfach in den neuen Ordner.</div></div>
+      <div class="full row">
+        <label class="switch"><input type="checkbox" name="active" checked> <span data-i18n="f.active">Aktiv</span></label>
+        <button class="btn primary" type="submit" data-i18n="new.save">Anzeige speichern</button>
+      </div>
+      <div class="full msg" id="newMsg"></div>
+    </form>
+  </section>
+
+  <!-- Jobs -->
+  <section class="view" id="view-jobs">
+    <h1 data-i18n="jobs.title">Aktionen &amp; Protokoll</h1>
+    <p class="sub" data-i18n="jobs.sub">Startet Befehle des Bots. Browser-Aktionen öffnen das konfigurierte Chrome/Edge-Fenster auf diesem Rechner.</p>
+    <div class="split">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card pad">
+          <h2 data-i18n="jobs.options">Optionen</h2>
+          <div class="form" style="grid-template-columns:1fr;gap:12px">
+            <div><label for="j-ads" data-i18n="jobs.ads">Anzeigen-Auswahl (--ads)</label><input type="text" id="j-ads" placeholder="due, new, changed, all, 123,456"><div class="hint" data-i18n="jobs.adsHint">Leer = Standard des Befehls</div></div>
+            <label class="switch"><input type="checkbox" id="j-keep"> <span data-i18n="jobs.keepOld">Alte Anzeigen behalten (--keep-old)</span></label>
+            <label class="switch"><input type="checkbox" id="j-verbose"> <span data-i18n="jobs.verbose">Ausführliche Ausgabe (-v)</span></label>
+          </div>
+        </div>
+        <div class="card pad"><h2 data-i18n="jobs.history">Verlauf</h2><ul class="history" id="history"></ul></div>
+      </div>
+      <div>
+        <div class="cmds" id="cmds"></div>
+        <div class="row" style="margin-bottom:8px"><b id="jobTitle" data-i18n="jobs.noJob">Noch keine Aktion gestartet</b><button class="btn small danger" id="cancelJob" disabled data-i18n="jobs.cancel">Abbrechen</button></div>
+        <div class="console" id="console"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Config -->
+  <section class="view" id="view-config">
+    <div class="row" style="flex-wrap:wrap;margin-bottom:12px;align-items:flex-start">
+      <div><h1 data-i18n="config.title">Konfiguration</h1><p class="sub" id="configFile"></p></div>
+      <div style="display:flex;gap:8px"><button class="btn" id="cfgReload" data-i18n="config.reload">Neu laden</button><button class="btn" id="cfgValidate" data-i18n="config.validate">Prüfen</button><button class="btn primary" id="cfgSave" data-i18n="config.save">Speichern</button></div>
+    </div>
+    <div class="card pad"><textarea class="code" id="cfgText" spellcheck="false"></textarea><div class="msg" id="cfgMsg"></div></div>
+  </section>
+</main>
+
+<dialog id="editDialog">
+  <div class="head"><b id="editTitle"></b><button class="btn small" data-close data-i18n="dlg.close">Schließen</button></div>
+  <div class="content"><textarea class="code" id="editText" spellcheck="false" style="min-height:55vh"></textarea><div class="msg" id="editMsg"></div></div>
+  <div class="foot"><button class="btn danger" id="editDelete" data-i18n="dlg.deleteFile">Datei löschen</button><span style="flex:1"></span><button class="btn" data-close data-i18n="dlg.cancel">Abbrechen</button><button class="btn primary" id="editSave" data-i18n="dlg.save">Speichern</button></div>
+</dialog>
+<dialog id="priceDialog">
+  <div class="head"><b id="psTitle"></b><button class="btn small" data-close-ps data-i18n="dlg.close">Schließen</button></div>
+  <div class="content">
+    <form class="ps-head" id="psForm"><input type="text" id="psQuery" data-i18n-placeholder="ps.query" placeholder="Suchbegriff"><button class="btn" type="submit" data-i18n="ps.search">Suchen</button></form>
+    <div id="psBody"></div>
+  </div>
+  <div class="foot" id="psFoot"></div>
+</dialog>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+const LANG = (new URLSearchParams(location.search).get("lang") || navigator.language || "de").toLowerCase().startsWith("de") ? "de" : "en";
+const EN = {
+  "nav.ads": "Ads", "nav.new": "New ad", "nav.jobs": "Actions & log", "nav.config": "Configuration",
+  "ads.title": "My ads", "ads.reload": "↻ Reload", "ads.verify": "Verify", "ads.publishDue": "Publish new & due ads", "ads.search": "Search title, category, ID …",
+  "sort.title": "Title A–Z", "sort.priceDesc": "Price high–low", "sort.priceAsc": "Price low–high", "sort.updated": "Recently updated",
+  "sel.publish": "Publish", "sel.update": "Update", "sel.extend": "Extend", "sel.reserve": "Reserve", "sel.activate": "Re-activate", "sel.delete": "Delete online", "sel.clear": "Clear selection",
+  "new.title": "Create new ad", "new.sub": "The ad is saved as a YAML file below “ads/” next to your configuration. Add more fields in the editor afterwards.", "new.save": "Save ad",
+  "f.title": "Title", "f.titleHint": "10–65 characters", "f.description": "Description", "f.price": "Price (€)", "f.priceType": "Price type", "f.default": "Default from configuration",
+  "f.category": "Category", "f.categoryHint": "Name from the list or an ID, e.g. 161/176/sonstige", "f.shipping": "Shipping", "f.images": "Images (one path or pattern per line)",
+  "f.imagesHint": "Relative to the ad folder, e.g. “*.jpg” – just drop the images into the new folder.", "f.active": "Active",
+  "pt.FIXED": "Fixed price", "pt.NEGOTIABLE": "Negotiable", "pt.GIVE_AWAY": "Give away", "pt.NOT_APPLICABLE": "Not specified",
+  "st.PICKUP": "Pickup only", "st.SHIPPING": "Shipping possible", "st.NOT_APPLICABLE": "Not specified",
+  "jobs.title": "Actions & log", "jobs.sub": "Runs bot commands. Browser actions open the configured Chrome/Edge window on this computer.", "jobs.options": "Options",
+  "jobs.ads": "Ad selection (--ads)", "jobs.adsHint": "Empty = command default", "jobs.keepOld": "Keep old ads (--keep-old)", "jobs.verbose": "Verbose output (-v)",
+  "jobs.history": "History", "jobs.noJob": "No action started yet", "jobs.cancel": "Cancel",
+  "config.title": "Configuration", "config.reload": "Reload", "config.validate": "Validate", "config.save": "Save",
+  "ps.query": "Search term", "ps.search": "Search", "ps.button": "Price suggestion",
+  "dlg.close": "Close", "dlg.deleteFile": "Delete file", "dlg.cancel": "Cancel", "dlg.save": "Save",
+};
+const DE_EXTRA = {
+  "ps.button": "Preisvorschlag", "ps.title": "Preisvorschlag: {t}", "ps.loading": "Suche vergleichbare Angebote auf kleinanzeigen.de …",
+  "ps.suggested": "Empfohlener Preis", "ps.quick": "Schneller Verkauf", "ps.range": "Übliche Spanne", "ps.minmax": "Min – Max",
+  "ps.basis": "Basis: {n} vergleichbare Angebote{c}", "ps.inCat": " in der Kategorie", "ps.allCats": " (alle Kategorien)",
+  "ps.outliers": "{n} Ausreißer und unpassende Angebote ignoriert.", "ps.vb": "{p} % der Vergleichsangebote sind VB.",
+  "ps.tooFew": "Zu wenige vergleichbare Angebote mit Preis gefunden ({n}). Versuche einen allgemeineren Suchbegriff.",
+  "ps.apply": "{p} übernehmen", "ps.openSearch": "Suche öffnen ↗", "ps.applied": "Preis auf {p} gesetzt",
+  "ps.current": "Aktuell: {p}", "ps.needTitle": "Bitte zuerst einen Titel eingeben.",
+  "ps.inline": "Vorschlag {p} (schneller Verkauf {q}) aus {n} Angeboten", "ps.list": "Vergleichsangebote (ausgegraut = nicht berücksichtigt)",
+  "st.PICKUP": "Nur Abholung", "st.SHIPPING": "Versand möglich", "st.NOT_APPLICABLE": "Keine Angabe",
+  "stat.all": "Gesamt", "stat.published-local": "Online", "stat.draft": "Neu", "stat.changed": "Geändert", "stat.due": "Fällig", "stat.disabled": "Deaktiviert",
+  "status.published-local": "online", "status.draft": "neu", "status.changed": "geändert", "status.due": "fällig", "status.disabled": "deaktiviert", "status.unknown": "unbekannt",
+  "act.edit": "Bearbeiten", "act.publish": "Veröffentlichen", "act.update": "Aktualisieren", "act.enable": "Aktivieren", "act.disable": "Deaktivieren", "act.open": "Ansehen ↗",
+  "empty": "Keine Anzeigen gefunden.", "empty.hint": "Lege eine neue Anzeige an oder lade deine bestehenden Anzeigen herunter.",
+  "selected": "{n} ausgewählt", "noImage": "Kein Bild", "images": "{n} Bilder", "errors": "{n} Anzeigendatei(en) konnten nicht geladen werden",
+  "price.GIVE_AWAY": "Zu verschenken", "price.none": "Ohne Preis", "price.vb": "VB",
+  "toast.saved": "Gespeichert", "toast.started": "Gestartet: {c}", "toast.done": "Fertig: {c}", "toast.failed": "Fehlgeschlagen: {c} (Code {x})", "toast.valid": "Konfiguration ist gültig ✓",
+  "toast.created": "Anzeige angelegt: {f}", "toast.deleted": "Datei gelöscht",
+  "confirm.delete": "Ausgewählte Anzeigen ({ids}) wirklich auf kleinanzeigen.de löschen?", "confirm.deleteFile": "Lokale Datei {f} wirklich löschen?",
+  "confirm.unsaved": "Ungespeicherte Änderungen verwerfen?", "running": "läuft: {c}", "jobs.runningTitle": "{c} läuft …", "jobs.doneTitle": "{c} – beendet (Code {x})",
+  "noId": "Nur Anzeigen mit ID (bereits veröffentlicht) können ausgewählt werden.",
+  "cmd.verify": "Prüfen|Konfiguration und Anzeigen validieren", "cmd.status": "Status|Status und Preisreduktion anzeigen",
+  "cmd.publish": "Veröffentlichen|Neue und fällige Anzeigen hochladen", "cmd.update": "Aktualisieren|Geänderte Anzeigen online ändern",
+  "cmd.extend": "Verlängern|Ablaufende Anzeigen verlängern", "cmd.download": "Herunterladen|Online-Anzeigen lokal speichern",
+  "cmd.list": "Online-Liste|Aktuelle Online-Anzeigen auflisten", "cmd.reserve": "Reservieren|Anzeigen aus der Suche nehmen",
+  "cmd.activate": "Reaktivieren|Reservierte Anzeigen aktivieren", "cmd.delete": "Löschen|Anzeigen online löschen (Auswahl nötig)",
+  "cmd.update-content-hash": "Hashes neu berechnen|Nach Änderung der ad_defaults", "cmd.diagnose": "Diagnose|Browser-Verbindung prüfen",
+  "cmd.update-check": "Update-Check|Nach neuer Version suchen",
+};
+const EN_EXTRA = {
+  "ps.title": "Price suggestion: {t}", "ps.loading": "Searching comparable listings on kleinanzeigen.de …",
+  "ps.suggested": "Suggested price", "ps.quick": "Quick sale", "ps.range": "Typical range", "ps.minmax": "Min – max",
+  "ps.basis": "Based on {n} comparable listings{c}", "ps.inCat": " in the category", "ps.allCats": " (all categories)",
+  "ps.outliers": "{n} outliers and unrelated listings ignored.", "ps.vb": "{p} % of the comparable listings are negotiable.",
+  "ps.tooFew": "Too few comparable listings with a price found ({n}). Try a more general search term.",
+  "ps.apply": "Use {p}", "ps.openSearch": "Open search ↗", "ps.applied": "Price set to {p}",
+  "ps.current": "Current: {p}", "ps.needTitle": "Please enter a title first.",
+  "ps.inline": "Suggestion {p} (quick sale {q}) from {n} listings", "ps.list": "Comparable listings (greyed out = not used)",
+  "stat.all": "Total", "stat.published-local": "Online", "stat.draft": "New", "stat.changed": "Changed", "stat.due": "Due", "stat.disabled": "Disabled",
+  "status.published-local": "online", "status.draft": "new", "status.changed": "changed", "status.due": "due", "status.disabled": "disabled", "status.unknown": "unknown",
+  "act.edit": "Edit", "act.publish": "Publish", "act.update": "Update", "act.enable": "Enable", "act.disable": "Disable", "act.open": "View ↗",
+  "empty": "No ads found.", "empty.hint": "Create a new ad or download your existing ads.",
+  "selected": "{n} selected", "noImage": "No image", "images": "{n} images", "errors": "{n} ad file(s) could not be loaded",
+  "price.GIVE_AWAY": "Give away", "price.none": "No price", "price.vb": "neg.",
+  "toast.saved": "Saved", "toast.started": "Started: {c}", "toast.done": "Done: {c}", "toast.failed": "Failed: {c} (code {x})", "toast.valid": "Configuration is valid ✓",
+  "toast.created": "Ad created: {f}", "toast.deleted": "File deleted",
+  "confirm.delete": "Really delete the selected ads ({ids}) on kleinanzeigen.de?", "confirm.deleteFile": "Really delete local file {f}?",
+  "confirm.unsaved": "Discard unsaved changes?", "running": "running: {c}", "jobs.runningTitle": "{c} running …", "jobs.doneTitle": "{c} – finished (code {x})",
+  "noId": "Only ads with an ID (already published) can be selected.",
+  "cmd.verify": "Verify|Validate config and ads", "cmd.status": "Status|Show status and price reduction",
+  "cmd.publish": "Publish|Upload new and due ads", "cmd.update": "Update|Push changed ads online",
+  "cmd.extend": "Extend|Extend expiring ads", "cmd.download": "Download|Save online ads locally",
+  "cmd.list": "Online list|List current online ads", "cmd.reserve": "Reserve|Hide ads from search",
+  "cmd.activate": "Re-activate|Activate reserved ads", "cmd.delete": "Delete|Delete ads online (selection required)",
+  "cmd.update-content-hash": "Recalculate hashes|After changing ad_defaults", "cmd.diagnose": "Diagnose|Check browser connection",
+  "cmd.update-check": "Update check|Look for a new version",
+};
+const DICT = LANG === "de" ? DE_EXTRA : Object.assign({}, EN, EN_EXTRA);
+function t(key, vars) {
+  let s = DICT[key] ?? key;
+  for (const [k, v] of Object.entries(vars || {})) s = s.replace("{" + k + "}", v);
+  return s;
+}
+document.documentElement.lang = LANG;
+if (LANG !== "de") {
+  document.querySelectorAll("[data-i18n]").forEach(el => { if (EN[el.dataset.i18n]) el.textContent = EN[el.dataset.i18n]; });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = EN[el.dataset.i18nPlaceholder]; });
+}
+
+const $ = sel => document.querySelector(sel);
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) node.append(c instanceof Node ? c : String(c));
+  return node;
+}
+function toast(text, kind) {
+  const node = el("div", { class: "toast " + (kind || "") }, text);
+  $("#toasts").append(node);
+  setTimeout(() => node.remove(), kind === "error" ? 7000 : 3500);
+}
+async function api(method, path, body) {
+  const opts = { method, headers: { "X-Requested-With": "kleinanzeigen-bot" } };
+  if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// ---- navigation ----
+function show(view) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + view));
+  if (view === "config") loadConfig();
+  if (view === "new") loadCategories();
+  history.replaceState(null, "", "#" + view);
+}
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
+$("#jobIndicator").addEventListener("click", () => show("jobs"));
+
+// ---- ads ----
+let ADS = [], FILTER = "all";
+const selected = new Set();
+const STATUSES = ["published-local", "draft", "changed", "due", "disabled"];
+const fmtPrice = ad => {
+  if (ad.price_type === "GIVE_AWAY") return t("price.GIVE_AWAY");
+  if (ad.price === null || ad.price === undefined) return t("price.none");
+  const p = new Intl.NumberFormat(LANG, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(ad.price);
+  return ad.price_type === "NEGOTIABLE" ? p + " " + t("price.vb") : p;
+};
+const fmtDate = v => v ? new Date(v).toLocaleDateString(LANG, { day: "2-digit", month: "2-digit", year: "numeric" }) : null;
+
+async function loadAds() {
+  try {
+    const data = await api("GET", "/api/ads");
+    ADS = data.ads;
+    const box = $("#adErrors");
+    box.hidden = !data.errors.length;
+    box.replaceChildren(el("b", {}, t("errors", { n: data.errors.length })),
+      ...data.errors.map(e => el("pre", {}, e.file + "\n" + e.error)));
+    renderAds();
+  } catch (e) {
+    $("#adGrid").replaceChildren(el("div", { class: "card empty", style: "grid-column:1/-1" }, el("b", {}, e.message)));
+    $("#stats").replaceChildren();
+  }
+}
+function renderStats() {
+  const counts = { all: ADS.length };
+  STATUSES.forEach(s => counts[s] = ADS.filter(a => a.status === s).length);
+  $("#stats").replaceChildren(...["all", ...STATUSES].map(s =>
+    el("div", { class: "card stat" + (FILTER === s ? " sel" : ""), onclick: () => { FILTER = FILTER === s ? "all" : s; renderAds(); } },
+      el("div", { class: "n" }, counts[s]), el("div", { class: "l" }, t("stat." + s)))));
+}
+function renderAds() {
+  renderStats();
+  const q = $("#search").value.trim().toLowerCase();
+  let list = ADS.filter(a => FILTER === "all" || a.status === FILTER)
+    .filter(a => !q || [a.title, a.category, a.id, a.file, a.description].join(" ").toLowerCase().includes(q));
+  const sort = $("#sort").value;
+  list.sort((a, b) => sort === "price-desc" ? (b.price ?? -1) - (a.price ?? -1)
+    : sort === "price-asc" ? (a.price ?? 1e12) - (b.price ?? 1e12)
+    : sort === "updated" ? String(b.updated_on || b.created_on || "").localeCompare(String(a.updated_on || a.created_on || ""))
+    : a.title.localeCompare(b.title, LANG));
+  const grid = $("#adGrid");
+  if (!list.length) {
+    grid.replaceChildren(el("div", { class: "card empty", style: "grid-column:1/-1" }, el("b", {}, t("empty")), el("div", {}, t("empty.hint"))));
+  } else {
+    grid.replaceChildren(...list.map(adCard));
+  }
+  renderSelection();
+}
+function adCard(ad) {
+  const thumb = el("div", { class: "thumb" },
+    ad.images.length ? el("img", { src: "/api/image?path=" + encodeURIComponent(ad.images[0]), alt: "", loading: "lazy" }) : t("noImage"),
+    ad.images.length > 1 ? el("span", { class: "count" }, t("images", { n: ad.images.length })) : null);
+  const check = ad.id ? el("input", { type: "checkbox", class: "check", title: "ID " + ad.id, checked: selected.has(ad.id),
+    onchange: e => { e.target.checked ? selected.add(ad.id) : selected.delete(ad.id); renderSelection(); } }) : null;
+  const date = fmtDate(ad.updated_on || ad.created_on);
+  return el("article", { class: "card ad" + (ad.active ? "" : " inactive") }, check, thumb,
+    el("div", { class: "body" },
+      el("div", { class: "row" }, el("span", { class: "badge " + ad.status }, t("status." + ad.status)), el("span", { class: "price" }, fmtPrice(ad))),
+      el("div", { class: "title" }, ad.title),
+      el("div", { class: "meta" },
+        ad.category ? el("span", {}, ad.category) : null,
+        ad.id ? el("span", {}, "#" + ad.id) : null,
+        date ? el("span", {}, date) : null,
+        ad.shipping_type ? el("span", {}, t("st." + ad.shipping_type) || ad.shipping_type) : null),
+      el("div", { class: "meta path" }, ad.file),
+      ...(ad.problems || []).map(pr => el("div", { class: "problem" }, "⚠ " + pr))),
+    el("div", { class: "actions" },
+      el("button", { class: "btn small", onclick: () => openEditor(ad.file) }, t("act.edit")),
+      ad.active && ad.id && ad.status !== "published-local" ? el("button", { class: "btn small primary", onclick: () => runJob(ad.status === "changed" ? "update" : "publish", String(ad.id)) }, t(ad.status === "changed" ? "act.update" : "act.publish")) : null,
+      el("button", { class: "btn small", onclick: () => openPriceDialog(ad) }, t("ps.button")),
+      el("button", { class: "btn small", onclick: () => toggleActive(ad) }, t(ad.active ? "act.disable" : "act.enable")),
+      ad.url ? el("a", { class: "btn small", href: ad.url, target: "_blank", rel: "noopener noreferrer" }, t("act.open")) : null));
+}
+function renderSelection() {
+  $("#selbar").classList.toggle("on", selected.size > 0);
+  $("#selCount").textContent = t("selected", { n: selected.size });
+}
+$("#selClear").addEventListener("click", () => { selected.clear(); renderAds(); });
+document.querySelectorAll("[data-sel]").forEach(b => b.addEventListener("click", () => {
+  const ids = [...selected].join(",");
+  if (b.dataset.sel === "delete" && !confirm(t("confirm.delete", { ids }))) return;
+  runJob(b.dataset.sel, ids);
+}));
+$("#search").addEventListener("input", renderAds);
+$("#sort").addEventListener("change", renderAds);
+$("#reloadAds").addEventListener("click", loadAds);
+document.querySelectorAll("[data-run]").forEach(b => b.addEventListener("click", () => runJob(b.dataset.run, b.dataset.ads)));
+
+async function toggleActive(ad) {
+  try { await api("POST", "/api/ad/active", { file: ad.file, active: !ad.active }); await loadAds(); }
+  catch (e) { toast(e.message, "error"); }
+}
+
+// ---- editor dialog ----
+let editFile = null, editOriginal = "";
+async function openEditor(file) {
+  try {
+    const data = await api("GET", "/api/ad?file=" + encodeURIComponent(file));
+    editFile = file; editOriginal = data.content;
+    $("#editTitle").textContent = data.file;
+    $("#editText").value = data.content;
+    $("#editMsg").textContent = "";
+    $("#editDialog").showModal();
+  } catch (e) { toast(e.message, "error"); }
+}
+function closeEditor() {
+  if ($("#editText").value !== editOriginal && !confirm(t("confirm.unsaved"))) return;
+  $("#editDialog").close();
+}
+document.querySelectorAll("#editDialog [data-close]").forEach(b => b.addEventListener("click", closeEditor));
+$("#editDialog").addEventListener("cancel", e => { e.preventDefault(); closeEditor(); });
+$("#editSave").addEventListener("click", async () => {
+  try {
+    await api("PUT", "/api/ad", { file: editFile, content: $("#editText").value });
+    editOriginal = $("#editText").value;
+    $("#editDialog").close(); toast(t("toast.saved")); loadAds();
+  } catch (e) { $("#editMsg").textContent = e.message; }
+});
+$("#editDelete").addEventListener("click", async () => {
+  if (!confirm(t("confirm.deleteFile", { f: editFile }))) return;
+  try { await api("DELETE", "/api/ad?file=" + encodeURIComponent(editFile)); $("#editDialog").close(); toast(t("toast.deleted")); loadAds(); }
+  catch (e) { $("#editMsg").textContent = e.message; }
+});
+$("#editText").addEventListener("keydown", e => {
+  if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "  "); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); $("#editSave").click(); }
+});
+
+// ---- price suggestion ----
+const eur = v => new Intl.NumberFormat(LANG, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+let psAd = null;
+async function fetchSuggestion(params) {
+  return api("GET", "/api/price-suggestion?" + new URLSearchParams(params).toString());
+}
+function openPriceDialog(ad) {
+  psAd = ad;
+  $("#psTitle").textContent = t("ps.title", { t: ad.title });
+  $("#psQuery").value = "";
+  $("#priceDialog").showModal();
+  runPriceSearch();
+}
+async function runPriceSearch() {
+  const body = $("#psBody"), foot = $("#psFoot");
+  body.replaceChildren(el("div", { class: "row", style: "justify-content:flex-start;gap:10px;padding:20px 0" }, el("div", { class: "spinner" }), t("ps.loading")));
+  foot.replaceChildren();
+  try {
+    const params = { file: psAd.file };
+    if ($("#psQuery").value.trim()) params.query = $("#psQuery").value.trim();
+    const r = await fetchSuggestion(params);
+    $("#psQuery").value = r.query;
+    renderSuggestion(r);
+  } catch (e) { body.replaceChildren(el("div", { class: "msg" }, e.message)); }
+}
+function priceBar(r) {
+  const used = r.comparables.filter(c => c.used && c.price != null).map(c => c.price);
+  const lo = r.minimum, hi = r.maximum, span = Math.max(hi - lo, 1);
+  const pos = v => ((v - lo) / span * 100).toFixed(2) + "%";
+  return el("div", { class: "ps-bar" }, el("div", { class: "track" }),
+    el("div", { class: "iqr", style: `left:${pos(r.lower_quartile)};width:calc(${pos(r.upper_quartile)} - ${pos(r.lower_quartile)})` }),
+    ...used.map(v => el("div", { class: "dot", style: `left:${pos(v)}` })),
+    el("div", { class: "med", style: `left:${pos(r.median)}` }),
+    el("div", { class: "lbl", style: "left:0;transform:none" }, eur(lo)),
+    el("div", { class: "lbl", style: `left:${pos(r.median)}` }, eur(r.median)),
+    el("div", { class: "lbl", style: "left:auto;right:0;transform:none" }, eur(hi)));
+}
+function renderSuggestion(r) {
+  const body = $("#psBody"), foot = $("#psFoot");
+  const items = el("ul", { class: "ps-list" }, ...r.comparables.map(c => el("li", { class: c.used ? "" : "unused" },
+    el("a", { href: c.url, target: "_blank", rel: "noopener noreferrer", title: c.title }, c.title || c.id),
+    el("b", {}, c.price_type === "GIVE_AWAY" ? t("price.GIVE_AWAY") : c.price == null ? "–" : eur(c.price) + (c.price_type === "NEGOTIABLE" ? " " + t("price.vb") : "")))));
+  const searchLink = el("a", { class: "btn", href: r.search_url, target: "_blank", rel: "noopener noreferrer" }, t("ps.openSearch"));
+  if (r.suggested_price == null) {
+    body.replaceChildren(el("div", { class: "msg" }, t("ps.tooFew", { n: r.count })), el("p", { class: "ps-note" }, t("ps.list")), items);
+    foot.replaceChildren(searchLink);
+    return;
+  }
+  body.replaceChildren(
+    el("div", { class: "ps-summary" },
+      el("div", { class: "card main" }, el("div", { class: "n" }, eur(r.suggested_price)), el("div", { class: "l" }, t("ps.suggested"))),
+      el("div", { class: "card" }, el("div", { class: "n" }, eur(r.quick_sale_price)), el("div", { class: "l" }, t("ps.quick"))),
+      el("div", { class: "card" }, el("div", { class: "n" }, eur(r.lower_quartile) + " – " + eur(r.upper_quartile)), el("div", { class: "l" }, t("ps.range"))),
+      psAd && psAd.price != null ? el("div", { class: "card" }, el("div", { class: "n" }, eur(psAd.price)), el("div", { class: "l" }, t("ps.current", { p: "" }).replace(/:\s*$/, ""))) : null),
+    priceBar(r),
+    el("p", { class: "ps-note" }, t("ps.basis", { n: r.count, c: r.category_id ? t("ps.inCat") : t("ps.allCats") }) + ". "
+      + (r.outliers ? t("ps.outliers", { n: r.outliers }) + " " : "") + t("ps.vb", { p: Math.round(r.negotiable_share * 100) })),
+    el("p", { class: "ps-note" }, t("ps.list")), items);
+  const apply = price => async () => {
+    try { await api("POST", "/api/ad/price", { file: psAd.file, price }); toast(t("ps.applied", { p: eur(price) })); $("#priceDialog").close(); loadAds(); }
+    catch (e) { toast(e.message, "error"); }
+  };
+  foot.replaceChildren(searchLink, el("span", { style: "flex:1" }),
+    el("button", { class: "btn", onclick: apply(r.quick_sale_price) }, t("ps.apply", { p: eur(r.quick_sale_price) })),
+    el("button", { class: "btn primary", onclick: apply(r.suggested_price) }, t("ps.apply", { p: eur(r.suggested_price) })));
+}
+$("#psForm").addEventListener("submit", e => { e.preventDefault(); runPriceSearch(); });
+document.querySelectorAll("[data-close-ps]").forEach(b => b.addEventListener("click", () => $("#priceDialog").close()));
+$("#f-suggest").addEventListener("click", async () => {
+  const f = $("#newForm"), info = $("#f-suggest-info"), btn = $("#f-suggest");
+  if (!f.title.value.trim()) { info.textContent = t("ps.needTitle"); f.title.focus(); return; }
+  btn.disabled = true; info.textContent = t("ps.loading");
+  try {
+    const r = await fetchSuggestion({ title: f.title.value, category: f.category.value });
+    if (r.suggested_price == null) { info.textContent = t("ps.tooFew", { n: r.count }); return; }
+    f.price.value = r.suggested_price;
+    info.textContent = t("ps.inline", { p: eur(r.suggested_price), q: eur(r.quick_sale_price), n: r.count });
+  } catch (e) { info.textContent = e.message; }
+  finally { btn.disabled = false; }
+});
+
+// ---- new ad ----
+let categoriesLoaded = false;
+async function loadCategories() {
+  if (categoriesLoaded) return;
+  try {
+    const cats = await api("GET", "/api/categories");
+    $("#categoryList").replaceChildren(...cats.map(c => el("option", { value: c.name }, c.id)));
+    categoriesLoaded = true;
+  } catch (e) { /* config errors are shown elsewhere */ }
+}
+$("#newForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  body.active = fd.has("active");
+  $("#newMsg").textContent = "";
+  try {
+    const res = await api("POST", "/api/ads", body);
+    toast(t("toast.created", { f: res.file }));
+    e.target.reset();
+    await loadAds(); show("ads");
+  } catch (err) { $("#newMsg").textContent = err.message; }
+});
+
+// ---- config ----
+let cfgOriginal = "";
+async function loadConfig(force) {
+  if (!force && $("#cfgText").value && $("#cfgText").value !== cfgOriginal) return;
+  try {
+    const data = await api("GET", "/api/config");
+    $("#configFile").textContent = data.path;
+    $("#cfgText").value = cfgOriginal = data.content;
+    $("#cfgMsg").textContent = "";
+  } catch (e) { $("#cfgMsg").textContent = e.message; }
+}
+$("#cfgReload").addEventListener("click", () => { if ($("#cfgText").value === cfgOriginal || confirm(t("confirm.unsaved"))) loadConfig(true); });
+$("#cfgValidate").addEventListener("click", async () => {
+  const msg = $("#cfgMsg");
+  try { await api("POST", "/api/config/validate", { content: $("#cfgText").value }); msg.className = "msg good"; msg.textContent = t("toast.valid"); }
+  catch (e) { msg.className = "msg"; msg.textContent = e.message; }
+});
+$("#cfgSave").addEventListener("click", async () => {
+  const msg = $("#cfgMsg");
+  try {
+    await api("PUT", "/api/config", { content: $("#cfgText").value });
+    cfgOriginal = $("#cfgText").value; msg.className = "msg good"; msg.textContent = t("toast.saved"); loadAds(); categoriesLoaded = false;
+  } catch (e) { msg.className = "msg"; msg.textContent = e.message; }
+});
+$("#cfgText").addEventListener("keydown", e => {
+  if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "  "); }
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); $("#cfgSave").click(); }
+});
+
+// ---- jobs ----
+const CMD_ORDER = ["verify", "status", "publish", "update", "extend", "download", "list", "reserve", "activate", "delete", "update-content-hash", "diagnose", "update-check"];
+$("#cmds").replaceChildren(...CMD_ORDER.map(c => {
+  const [title, desc] = t("cmd." + c).split("|");
+  return el("button", { class: "cmd", onclick: () => {
+    const ads = $("#j-ads").value.trim();
+    if (c === "delete" && (!ads || !confirm(t("confirm.delete", { ids: ads })))) { if (!ads) $("#j-ads").focus(); return; }
+    runJob(c, ads || undefined);
+  } }, el("b", {}, title), el("span", {}, desc));
+}));
+let jobId = null, nextLine = 0, polling = null;
+async function runJob(command, ads) {
+  try {
+    const job = await api("POST", "/api/jobs", { command, ads, keep_old: $("#j-keep").checked, verbose: $("#j-verbose").checked, lang: LANG });
+    toast(t("toast.started", { c: job.args.join(" ") }));
+    show("jobs");
+    jobId = job.id; nextLine = 0; $("#console").replaceChildren();
+    pollJob();
+  } catch (e) { toast(e.message, "error"); }
+}
+function lineClass(line) {
+  if (line.startsWith("$ ")) return "cmdline";
+  if (/\b(ERROR|FEHLER|Traceback|Exception)\b/.test(line)) return "err";
+  if (/\b(WARNING|WARNUNG)\b/.test(line)) return "warn";
+  return null;
+}
+async function pollJob() {
+  clearTimeout(polling);
+  let data;
+  try { data = await api("GET", "/api/jobs/current?since=" + (jobId === null ? 0 : nextLine)); }
+  catch (e) { polling = setTimeout(pollJob, 3000); return; }
+  renderHistory(data.history);
+  const job = data.job;
+  if (!job) return;
+  if (job.id !== jobId) { jobId = job.id; nextLine = 0; $("#console").replaceChildren(); return pollJob(); }
+  const con = $("#console");
+  const atBottom = con.scrollHeight - con.scrollTop - con.clientHeight < 40;
+  con.append(...job.lines.map(l => el("div", { class: lineClass(l) }, l || " ")));
+  if (atBottom) con.scrollTop = con.scrollHeight;
+  nextLine = job.next;
+  const name = job.args.join(" ");
+  $("#jobTitle").textContent = job.running ? t("jobs.runningTitle", { c: name }) : t("jobs.doneTitle", { c: name, x: job.exit_code });
+  $("#cancelJob").disabled = !job.running;
+  $("#jobIndicator").classList.toggle("on", job.running);
+  $("#jobIndicatorText").textContent = t("running", { c: job.command });
+  document.querySelectorAll("[data-run], [data-sel], .cmd").forEach(b => b.disabled = job.running);
+  if (job.running) { polling = setTimeout(pollJob, 700); }
+  else if (job.finished && wasRunning === job.id) {
+    wasRunning = null;
+    job.exit_code === 0 ? toast(t("toast.done", { c: name })) : toast(t("toast.failed", { c: name, x: job.exit_code }), "error");
+    loadAds();
+  }
+  if (job.running) wasRunning = job.id;
+}
+let wasRunning = null;
+function renderHistory(items) {
+  $("#history").replaceChildren(...items.map(h => el("li", {},
+    el("span", {}, new Date(h.started * 1000).toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" }) + "  " + h.args.join(" ")),
+    el("span", { class: h.exit_code === 0 ? "ok" : "fail" }, h.exit_code === 0 ? "✓" : "✗ " + h.exit_code))));
+}
+$("#cancelJob").addEventListener("click", async () => { try { await api("POST", "/api/jobs/cancel"); } catch (e) { toast(e.message, "error"); } });
+
+// ---- init ----
+(async () => {
+  try {
+    const info = await api("GET", "/api/info");
+    $("#version").textContent = "v" + info.version;
+    $("#configPath").textContent = info.config_file;
+  } catch (e) { toast(e.message, "error"); }
+  const start = location.hash.slice(1);
+  if (["ads", "new", "jobs", "config"].includes(start)) show(start);
+  loadAds();
+  pollJob();
+})();
+</script>
+</body>
+</html>

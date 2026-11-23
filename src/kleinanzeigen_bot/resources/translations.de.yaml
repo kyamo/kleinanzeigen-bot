@@ -35,6 +35,7 @@ kleinanzeigen_bot/cli.py:
     "Unknown command: %s": "Unbekannter Befehl: %s"
     "More than one command given: %s": "Mehr als ein Befehl angegeben: %s"
     "Invalid --workspace-mode '%s'. Use 'portable' or 'xdg'.": "Ungültiger --workspace-mode '%s'. Verwenden Sie 'portable' oder 'xdg'."
+    "Invalid --port '%s'. Use a number between 1 and 65535.": "Ungültiger --port '%s'. Verwenden Sie eine Zahl zwischen 1 und 65535."
   _warn_unpatched_nodriver:
     ? "nodriver CDP re-attach patch not found: installed nodriver may miss the flat-mode fix. Plain pip installs skip the PDM post_install hook; run `pdm install` from a source checkout or `python scripts/fix_nodriver.py` from the repository. Symptom: repeated `Re-attaching CDP session after -32601`."
     : "nodriver CDP Re-Attach-Patch nicht gefunden: installiertes nodriver hat möglicherweise nicht den Flat-Mode-Fix. Reine pip-Installationen überspringen den PDM post_install-Hook; führen Sie `pdm install` in einem Quell-Checkout aus oder `python scripts/fix_nodriver.py` aus dem Repository. Symptom: wiederholtes `Re-attaching CDP session after -32601`."
@@ -1371,3 +1372,19 @@ kleinanzeigen_bot/utils/xdg_paths.py:
     "XDG footprint hits": "Gefundene XDG-Spuren"
     "Detected both portable and XDG footprints.": "Sowohl portable als auch XDG-Spuren wurden gefunden."
     "Detected neither portable nor XDG footprints.": "Weder portable noch XDG-Spuren wurden gefunden."
+
+#################################################
+kleinanzeigen_bot/web_ui.py:
+#################################################
+  _dispatch:
+    "Web UI request failed: %s %s": "Anfrage an die Weboberfläche fehlgeschlagen: %s %s"
+  serve:
+    "The web interface is reachable from other hosts and exposes your configuration including credentials!": "Die Weboberfläche ist von anderen Rechnern erreichbar und gibt Ihre Konfiguration inklusive Zugangsdaten preis!"
+    "Web interface running at %s (press CTRL+C to stop)": "Weboberfläche läuft unter %s (Beenden mit STRG+C)"
+    "Web interface stopped.": "Weboberfläche beendet."
+
+#################################################
+kleinanzeigen_bot/price_suggestion.py:
+#################################################
+  fetch_search_page:
+    "Fetching comparable listings from %s": "Lade Vergleichsangebote von %s"

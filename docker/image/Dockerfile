@@ -173,14 +173,15 @@ LABEL \
   org.opencontainers.image.vendor="Sebastian Thomschke" \
   org.opencontainers.image.licenses="AGPL-3.0" \
   org.opencontainers.image.title="kleinanzeigen-bot" \
-  org.opencontainers.image.description="CLI application to ease publishing of ads to kleinanzeigen.de"
+  org.opencontainers.image.description="CLI application and web interface to ease publishing of ads to kleinanzeigen.de"
 
 # https://stackoverflow.com/a/59812588/5116073
 ENV PYTHONUNBUFFERED=1
 
 # The container starts as root only so that run.sh can choose the account to run as
 # (unprivileged "user" unless an older root-owned data directory is detected).
-EXPOSE 6080
+# 6080: browser desktop (KasmVNC), 8090: web interface (command "web --host=0.0.0.0")
+EXPOSE 6080 8090
 ENTRYPOINT ["/bin/bash", "/opt/run.sh"]
 
 ENV \
