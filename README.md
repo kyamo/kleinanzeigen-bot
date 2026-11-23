@@ -7,11 +7,24 @@
 
 <!--[![Maintainability](https://qlty.sh/badges/69ff94b8-90e1-4096-91ed-3bcecf0b0597/maintainability.svg)](https://qlty.sh/gh/Second-Hand-Friends/projects/kleinanzeigen-bot)-->
 
+> [!NOTE]
+> **This is a fork of [Second-Hand-Friends/kleinanzeigen-bot](https://github.com/Second-Hand-Friends/kleinanzeigen-bot)**
+> that adds a **[web interface](#web-ui)** with **[price suggestions](#price-suggestions)** and a
+> **[Docker Compose setup](#quick-start)**. It is regularly updated from the upstream project.
+> The pre-compiled binaries and the `ghcr.io` Docker images linked below are published by the upstream project and
+> do **not** contain these additions; use the [quick start](#quick-start) or an
+> [installation from source](#installation-from-source) to get them.
+
+![Ad overview of the web interface](docs/screenshots/ads.png)
+
 **Feedback and high-quality pull requests are highly welcome!**
 
 1. [About](#about)
+1. [Quick start: web interface with Docker](#quick-start)
 1. [Installation](#installation)
 1. [Usage](#usage)
+   1. [Web interface](#web-ui)
+   1. [Price suggestions](#price-suggestions)
 1. [Configuration](#config)
    1. [Main configuration](#main-config)
    1. [Ad configuration](#ad-config)
@@ -36,7 +49,8 @@
 - **Extend Listings**: Extend ads close to expiry to keep watchers/savers and preserve the monthly ad quota
 - **Browser Automation**: Uses Chromium-based browsers (Chrome, Edge, Chromium) for reliable automation
 - **Flexible Configuration**: Configure defaults once, override per listing as needed
-- **Web Interface**: Manage ads, edit configuration and run all commands from a local browser UI (`kleinanzeigen-bot web`)
+- **Web Interface** *(fork)*: Manage ads, edit configuration and run all commands from a local browser UI (`kleinanzeigen-bot web`)
+- **Price Suggestions** *(fork)*: Suggest a price from comparable listings on kleinanzeigen.de and apply it with one click
 
 ### ⚠️ Legal Disclaimer
 
@@ -52,9 +66,38 @@ Es liegt in Ihrer Verantwortung, die rechtliche Zulässigkeit der Nutzung dieses
 Die Entwickler übernehmen keinerlei Haftung für mögliche Schäden oder rechtliche Konsequenzen.
 Die Nutzung erfolgt auf eigenes Risiko. Jede rechtswidrige Verwendung ist untersagt.
 
+## <a name="quick-start"></a>Quick start: web interface with Docker
+
+Requirements: [Docker](https://www.docker.com/) with the Compose plugin and a [git client](https://git-scm.com/downloads).
+
+```bash
+git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
+cd kleinanzeigen-bot
+GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
+```
+
+1. Open the web interface at <http://localhost:8090>.
+1. Go to **Configuration**, enter your kleinanzeigen.de login (`login.username`, `login.password`) and your contact
+   (`ad_defaults.contact.name`, `ad_defaults.contact.zipcode`), then save.
+1. Go to **Actions & log** and run **Download** to fetch your existing ads, or create one under **New ad**.
+1. When a command needs your attention (CAPTCHA, SMS code), open the browser desktop at <http://localhost:6080>
+   (login `user`, password in `./data/.vnc-password`) to see the bot's browser.
+
+Config, ads, images and the browser profile are stored in `./data`. Put the images of an ad into its folder
+(`./data/ads/<title>/`). Update later with `git pull` and the same `docker compose up -d --build` command;
+stop with `docker compose down`. See [Web interface in Docker](#web-ui-docker) for details.
+
+> [!TIP]
+> **Windows with WSL 2:** run the commands inside WSL. The ports are forwarded to Windows, so <http://localhost:8090>
+> works in your Windows browser. If Docker is installed in WSL without Docker Desktop and has no service script, start
+> the daemon with `sudo sh -c 'nohup dockerd > /var/log/dockerd.log 2>&1 &'`.
+
 ## <a name="installation"></a>Installation
 
 ### Installation using pre-compiled exe
+
+> [!IMPORTANT]
+> These binaries come from the upstream project and do not include the web interface or price suggestions of this fork.
 
 1. The following components need to be installed:
 
@@ -84,6 +127,10 @@ Die Nutzung erfolgt auf eigenes Risiko. Jede rechtswidrige Verwendung ist unters
       ```
 
 ### Installation using Docker
+
+> [!IMPORTANT]
+> The `ghcr.io/second-hand-friends/...` images come from the upstream project and do not include the web interface or
+> price suggestions of this fork. Build the image from this repository instead, see the [quick start](#quick-start).
 
 1. [Docker](https://www.docker.com/) needs to be installed.
 
@@ -143,7 +190,7 @@ The startup log states which mode is used.
 
 To sign in manually (CAPTCHA, SMS verification), run the container with the `login` command and `-it`; see [Manual login](docs/BROWSER_TROUBLESHOOTING.md#manual-login-and-sms-device-verification).
 
-**Web interface in Docker:**
+<a name="web-ui-docker"></a>**Web interface in Docker:**
 
 The image also runs the [web interface](#web-ui). The included `docker-compose.yml` builds the image from source and
 keeps the web interface running in the background:
@@ -183,7 +230,7 @@ Without Compose: `docker build -f docker/image/Dockerfile --build-arg GIT_COMMIT
 1. Clone the repo using
 
    ```bash
-   git clone https://github.com/Second-Hand-Friends/kleinanzeigen-bot/
+   git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
    ```
 
 1. Change into the directory:
@@ -220,7 +267,7 @@ Without Compose: `docker build -f docker/image/Dockerfile --build-arg GIT_COMMIT
 1. Clone the repo using
 
    ```bash
-   git clone https://github.com/Second-Hand-Friends/kleinanzeigen-bot/
+   git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
    ```
 
 1. Open the cloned directory in a Bash terminal window and navigate to the [docker](docker) subdirectory
@@ -362,14 +409,44 @@ config and ad files as the CLI:
 - **New ad**: form with category auto-completion that creates `ads/<title>/ad_<title>.yaml` next to the config
 - **Actions & log**: run any bot command (`verify`, `publish`, `update`, `download`, `extend`, …) with live log output,
   cancel it and see the history of recent runs
-- **Configuration**: edit `config.yaml` with schema validation before saving
+- **Configuration**: all options as a form with descriptions and defaults, grouped by topic and validated before saving;
+  only changed values are written to `config.yaml`, so comments and formatting are kept. Import and export the
+  configuration as YAML, or edit the raw YAML in the *YAML (advanced)* tab
+- **Price suggestion**: on every ad card and in the new-ad form, see [Price suggestions](#price-suggestions)
+
+| Actions & log | Configuration |
+| --- | --- |
+| ![Running a command with live log](docs/screenshots/actions.png) | ![Configuration form with all options](docs/screenshots/config.png) |
+| **New ad** | **Dark mode** (follows the operating system) |
+| ![New-ad form with price suggestion](docs/screenshots/new-ad.png) | ![Ad overview in dark mode](docs/screenshots/ads-dark.png) |
 
 Options: `--host=<HOST>` (default `127.0.0.1`), `--port=<PORT>` (default `8090`), `--open` (opens the default browser).
-The UI is available in German and English (browser language, or `?lang=de` / `?lang=en`).
+The UI is available in German and English: pick the language in the header (remembered per browser); the default is
+the browser language. Commands started from the UI log in the same language.
 
 > **Security:** the web interface has no login and shows your configuration including credentials. Keep the default
 > `127.0.0.1` binding unless the host is in a trusted network. `login` needs an interactive terminal and is therefore only
 > available from the CLI.
+
+### <a name="price-suggestions"></a>Price suggestions
+
+The web interface suggests a price from comparable listings on kleinanzeigen.de:
+
+1. Click **Price suggestion** on an ad card (or next to the price field when creating an ad).
+1. The bot searches the public search results for the ad title (filler words like "sehr guter Zustand", "VB" or
+   "Abholung" are dropped; you can edit the search term), first in the ad's category and, if that yields fewer than
+   three prices, in all categories. Up to two result pages are read; identical searches are cached for 15 minutes.
+1. Ignored: give-aways, listings without a price, your own ad, listings whose title does not match the search term,
+   placeholder prices (below 10 % of the median, e.g. "1 €") and outliers (1.5 × interquartile range).
+1. The dialog shows the **suggested price** (median), a **quick-sale price** (lower quartile), the typical range,
+   the share of negotiable (VB) listings and every comparable listing with a link. Apply a price with one click; it is
+   written to the ad file without touching comments or formatting.
+
+![Price suggestion dialog with comparable listings](docs/screenshots/price-suggestion.png)
+
+> [!NOTE]
+> The suggestion is based on *asking* prices of current listings, not on prices that were actually paid.
+> It reads the HTML of the public search page and stops working if kleinanzeigen.de changes that markup.
 
 ## <a name="config"></a>Configuration
 

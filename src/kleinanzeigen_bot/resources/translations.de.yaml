@@ -1376,6 +1376,46 @@ kleinanzeigen_bot/utils/xdg_paths.py:
 #################################################
 kleinanzeigen_bot/web_ui.py:
 #################################################
+  _body:
+    "Invalid JSON body": "Ungültiger JSON-Inhalt"
+    "JSON body must be an object": "Der JSON-Inhalt muss ein Objekt sein"
+    "Request too large": "Anfrage zu groß"
+  _check_same_origin:
+    "Cross-origin request rejected": "Anfrage von fremder Herkunft abgelehnt"
+    "Missing X-Requested-With header": "Header X-Requested-With fehlt"
+  _parse_document:
+    "Syntax error: %s": "Syntaxfehler: %s"
+  _route:
+    "Not found": "Nicht gefunden"
+  _validate_ad_data:
+    "The ad file must contain a mapping": "Die Anzeigendatei muss Schlüssel-Wert-Paare enthalten"
+  apply_config_changes:
+    "Invalid change: %s": "Ungültige Änderung: %s"
+    "The config file must contain a mapping": "Die Konfigurationsdatei muss Schlüssel-Wert-Paare enthalten"
+    "changes must be a non-empty list": "changes muss eine nicht leere Liste sein"
+  config_values:
+    "The config file must contain a mapping": "Die Konfigurationsdatei muss Schlüssel-Wert-Paare enthalten"
+  create_ad:
+    "Created %s, but it does not match the ad_files patterns in the config: %s": "%s wurde angelegt, passt aber nicht zu den ad_files-Mustern der Konfiguration: %s"
+    "price: must be a whole number": "price: muss eine ganze Zahl sein"
+    "title: Field required": "title: Pflichtfeld"
+  image_path:
+    "Access denied": "Zugriff verweigert"
+    "Not found": "Nicht gefunden"
+  price_suggestion:
+    "kleinanzeigen.de search failed: %s": "Suche auf kleinanzeigen.de fehlgeschlagen: %s"
+  resolve_ad_file:
+    "Unknown ad file: %s": "Unbekannte Anzeigendatei: %s"
+  set_ad_price:
+    "price: must be a whole number": "price: muss eine ganze Zahl sein"
+    "price: must not be negative": "price: darf nicht negativ sein"
+  start:
+    "Another command is still running": "Es läuft bereits ein anderer Befehl"
+    "Invalid ads selector: %s": "Ungültige Anzeigen-Auswahl: %s"
+    "The delete command requires an ads selector": "Der Befehl delete benötigt eine Anzeigen-Auswahl"
+    "Unsupported command: %s": "Nicht unterstützter Befehl: %s"
+  validate_config_text:
+    "The config file must contain a mapping": "Die Konfigurationsdatei muss Schlüssel-Wert-Paare enthalten"
   _dispatch:
     "Web UI request failed: %s %s": "Anfrage an die Weboberfläche fehlgeschlagen: %s %s"
   serve:
@@ -1388,3 +1428,5 @@ kleinanzeigen_bot/price_suggestion.py:
 #################################################
   fetch_search_page:
     "Fetching comparable listings from %s": "Lade Vergleichsangebote von %s"
+  suggest_price:
+    "A title or search query is required": "Ein Titel oder Suchbegriff ist erforderlich"

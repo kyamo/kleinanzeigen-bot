@@ -29,6 +29,7 @@ import time
 import unicodedata
 import webbrowser
 from dataclasses import dataclass, field
+from gettext import gettext as _
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -48,7 +49,9 @@ from .utils import loggers as _loggers
 from .utils import misc as _misc
 from .utils import xdg_paths as _xdg_paths
 from .utils.files import abspath
+from .utils.i18n import Locale, set_current_locale
 from .utils.misc import is_frozen
+from .utils.pydantics import format_validation_error
 
 if TYPE_CHECKING:
     from .model.ad_model import Ad
@@ -146,15 +149,15 @@ class JobRunner:
 
     def start(self, command:str, *, ads:str | None, keep_old:bool, verbose:bool, lang:str | None) -> Job:
         if command not in JOB_COMMANDS:
-            raise ApiError(HTTPStatus.BAD_REQUEST, f"Unsupported command: {command}")
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("Unsupported command: %s") % command)
         args = [command]
         if ads:
             ads = ads.strip().lower().replace(" ", "")
             if not _ADS_SELECTOR_PATTERN.match(ads):
-                raise ApiError(HTTPStatus.BAD_REQUEST, f"Invalid ads selector: {ads}")
+                raise ApiError(HTTPStatus.BAD_REQUEST, _("Invalid ads selector: %s") % ads)
             args.append(f"--ads={ads}")
         elif command == "delete":
-            raise ApiError(HTTPStatus.BAD_REQUEST, "The delete command requires an ads selector")
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("The delete command requires an ads selector"))
         if keep_old:
             args.append("--keep-old")
         if verbose:
@@ -164,7 +167,7 @@ class JobRunner:
 
         with self._lock:
             if self.current and self.current.running:
-                raise ApiError(HTTPStatus.CONFLICT, "Another command is still running")
+                raise ApiError(HTTPStatus.CONFLICT, _("Another command is still running"))
             job = Job(id = self._next_id, command = command, args = args)
             self._next_id += 1
             self.current = job
@@ -235,15 +238,7 @@ def _parse_document(text:str, suffix:str) -> Any:
             return json.loads(text)
         return _round_trip_yaml().load(text)
     except Exception as ex:
-        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Syntax error: {ex}") from ex
-
-
-def _format_validation_error(ex:ValidationError) -> str:
-    parts = []
-    for err in ex.errors():
-        loc = ".".join(str(item) for item in err.get("loc", ()))
-        parts.append(f"{loc}: {err.get('msg')}" if loc else str(err.get("msg")))
-    return "\n".join(parts) or str(ex)
+        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("Syntax error: %s") % ex) from ex
 
 
 def slugify(text:str) -> str:
@@ -266,7 +261,7 @@ class BotContext:
         try:
             return _runtime_config.load_config(self.config_file_path, None, "web")
         except ValidationError as ex:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _format_validation_error(ex)) from ex
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, format_validation_error(ex)) from ex
         except Exception as ex:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, str(ex)) from ex
 
@@ -279,7 +274,7 @@ class BotContext:
     def validate_config_text(self, text:str) -> None:
         data = _parse_document(text, Path(self.config_file_path).suffix)
         if not isinstance(data, dict):
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "The config file must contain a mapping")
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("The config file must contain a mapping"))
         data = json.loads(json.dumps(data, default = str))
         try:
             _runtime_config._resolve_login_credentials(data)  # noqa: SLF001 same validation as the CLI
@@ -288,11 +283,55 @@ class BotContext:
         try:
             Config.model_validate(data, strict = True, context = self.config_file_path)
         except ValidationError as ex:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _format_validation_error(ex)) from ex
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, format_validation_error(ex)) from ex
 
     def write_config_text(self, text:str) -> None:
         self.validate_config_text(text)
         Path(self.config_file_path).write_text(text, encoding = "utf-8")
+
+    @staticmethod
+    def config_schema() -> dict[str, Any]:
+        return Config.model_json_schema()
+
+    def config_values(self) -> dict[str, Any]:
+        """Return the effective config (file values merged with defaults) without resolving ``${ENV}`` placeholders."""
+        data = _parse_document(self.read_config_text(), Path(self.config_file_path).suffix)
+        if not isinstance(data, dict):
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("The config file must contain a mapping"))
+        try:
+            config = Config.model_validate(json.loads(json.dumps(data, default = str)), strict = True, context = self.config_file_path)
+        except ValidationError as ex:
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, format_validation_error(ex)) from ex
+        return config.model_dump(mode = "json")
+
+    def apply_config_changes(self, changes:Any) -> None:
+        """Apply ``[{"path": [...], "value": ...}]`` to the config file, keeping comments and untouched values."""
+        if not isinstance(changes, list) or not changes:
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("changes must be a non-empty list"))
+        path = Path(self.config_file_path)
+        if path.suffix == ".json":
+            data:Any = json.loads(self.read_config_text())
+        else:
+            data = _round_trip_yaml().load(self.read_config_text())
+        if not isinstance(data, dict):
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("The config file must contain a mapping"))
+        for change in changes:
+            keys = change.get("path") if isinstance(change, dict) else None
+            if not isinstance(keys, list) or not keys or not all(isinstance(key, str) and key for key in keys):
+                raise ApiError(HTTPStatus.BAD_REQUEST, _("Invalid change: %s") % change)
+            target = data
+            for key in keys[:-1]:
+                if not isinstance(target.get(key), dict):
+                    target[key] = {}
+                target = target[key]
+            target[keys[-1]] = change.get("value")
+        if path.suffix == ".json":
+            text = json.dumps(data, indent = 2, ensure_ascii = False)
+        else:
+            buffer = io.StringIO()
+            _round_trip_yaml().dump(data, buffer)
+            text = buffer.getvalue()
+        self.write_config_text(text)
 
     # -- ads ----------------------------------------------------------------
 
@@ -305,7 +344,7 @@ class BotContext:
         for abs_path, rel_path in self._ad_files(cfg).items():
             if rel in {rel_path, abs_path}:
                 return abs_path
-        raise ApiError(HTTPStatus.NOT_FOUND, f"Unknown ad file: {rel}")
+        raise ApiError(HTTPStatus.NOT_FOUND, _("Unknown ad file: %s") % rel)
 
     def list_ads(self) -> dict[str, Any]:
         state = self.load_state()
@@ -322,7 +361,7 @@ class BotContext:
                 errors.append({"file": rel_path, "error": ex.message})
                 continue
             except ValidationError as ex:
-                errors.append({"file": rel_path, "error": _format_validation_error(ex)})
+                errors.append({"file": rel_path, "error": format_validation_error(ex)})
                 continue
             except Exception as ex:
                 errors.append({"file": rel_path, "error": str(ex)})
@@ -379,11 +418,11 @@ class BotContext:
 
     def _validate_ad_data(self, data:Any, config:Config, file_hint:str) -> None:
         if not isinstance(data, dict):
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "The ad file must contain a mapping")
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("The ad file must contain a mapping"))
         try:
             ad_loading.load_ad(data, config.ad_defaults, file_hint)
         except ValidationError as ex:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _format_validation_error(ex)) from ex
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, format_validation_error(ex)) from ex
         except Exception as ex:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, str(ex)) from ex
 
@@ -420,9 +459,9 @@ class BotContext:
         try:
             value = int(price)
         except (TypeError, ValueError) as ex:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "price: must be a whole number") from ex
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("price: must be a whole number")) from ex
         if value < 0:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "price: must not be negative")
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("price: must not be negative"))
         self.set_ad_field(rel, "price", value)
 
     def price_suggestion(self, query:dict[str, str]) -> dict[str, Any]:
@@ -446,7 +485,7 @@ class BotContext:
         except ValueError as ex:
             raise ApiError(HTTPStatus.BAD_REQUEST, str(ex)) from ex
         except requests.RequestException as ex:
-            raise ApiError(HTTPStatus.BAD_GATEWAY, f"kleinanzeigen.de search failed: {ex}") from ex
+            raise ApiError(HTTPStatus.BAD_GATEWAY, _("kleinanzeigen.de search failed: %s") % ex) from ex
         return result.to_dict()
 
     def create_ad(self, fields:dict[str, Any]) -> dict[str, str]:
@@ -454,7 +493,7 @@ class BotContext:
         config = state.config
         title = str(fields.get("title") or "").strip()
         if not title:
-            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "title: Field required")
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("title: Field required"))
 
         data:dict[str, Any] = {"active": bool(fields.get("active", True)), "type": fields.get("type") or "OFFER", "title": title}
         description = str(fields.get("description") or "").strip()
@@ -465,7 +504,7 @@ class BotContext:
             try:
                 data["price"] = int(price)
             except (TypeError, ValueError) as ex:
-                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "price: must be a whole number") from ex
+                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("price: must be a whole number")) from ex
         for key in ("price_type", "shipping_type"):
             if fields.get(key):
                 data[key] = fields[key]
@@ -497,7 +536,7 @@ class BotContext:
         if abspath(str(target)) not in self._ad_files(config):
             raise ApiError(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
-                f"Created {rel}, but it does not match the ad_files patterns in the config: {config.ad_files}",
+                _("Created %s, but it does not match the ad_files patterns in the config: %s") % (rel, config.ad_files),
             )
         return {"file": rel}
 
@@ -509,9 +548,9 @@ class BotContext:
         """Return an image path below the config directory, refusing anything else."""
         candidate = (self.config_dir / rel).resolve()
         if not candidate.is_relative_to(self.config_dir.resolve()) or candidate.suffix.lower() not in _IMAGE_SUFFIXES:
-            raise ApiError(HTTPStatus.FORBIDDEN, "Access denied")
+            raise ApiError(HTTPStatus.FORBIDDEN, _("Access denied"))
         if not candidate.is_file():
-            raise ApiError(HTTPStatus.NOT_FOUND, "Not found")
+            raise ApiError(HTTPStatus.NOT_FOUND, _("Not found"))
         return candidate
 
     def categories(self) -> list[dict[str, str]]:
@@ -567,28 +606,31 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
     def _body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length") or 0)
         if length > _MAX_BODY_BYTES:
-            raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Request too large")
+            raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, _("Request too large"))
         raw = self.rfile.read(length) if length else b"{}"
         try:
             data = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as ex:
-            raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid JSON body") from ex
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("Invalid JSON body")) from ex
         if not isinstance(data, dict):
-            raise ApiError(HTTPStatus.BAD_REQUEST, "JSON body must be an object")
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("JSON body must be an object"))
         return data
 
     def _check_same_origin(self) -> None:
         """Block cross-site requests (CSRF / DNS rebinding) to state-changing endpoints."""
         if self.headers.get("X-Requested-With") != "kleinanzeigen-bot":
-            raise ApiError(HTTPStatus.FORBIDDEN, "Missing X-Requested-With header")
+            raise ApiError(HTTPStatus.FORBIDDEN, _("Missing X-Requested-With header"))
         origin = self.headers.get("Origin")
         host = self.headers.get("Host")
         if origin and host and urlparse(origin).netloc != host:
-            raise ApiError(HTTPStatus.FORBIDDEN, "Cross-origin request rejected")
+            raise ApiError(HTTPStatus.FORBIDDEN, _("Cross-origin request rejected"))
 
     def _dispatch(self, method:str) -> None:
         url = urlparse(self.path)
         query = {k: v[-1] for k, v in parse_qs(url.query).items()}
+        ui_lang = self.headers.get("X-UI-Lang", "")
+        if ui_lang in {"de", "en"}:
+            set_current_locale(Locale(ui_lang))  # single local user: per-request switch of the global locale is fine
         try:
             if method != "GET":
                 self._check_same_origin()
@@ -671,6 +713,13 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
             case "PUT", "/api/config":
                 ctx.write_config_text(str(self._body().get("content", "")))
                 self._json({"ok": True})
+            case "GET", "/api/config/schema":
+                self._json(ctx.config_schema())
+            case "GET", "/api/config/values":
+                self._json(ctx.config_values())
+            case "PUT", "/api/config/values":
+                ctx.apply_config_changes(self._body().get("changes"))
+                self._json({"ok": True})
             case "POST", "/api/config/validate":
                 ctx.validate_config_text(str(self._body().get("content", "")))
                 self._json({"ok": True})
@@ -691,7 +740,7 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
             case "POST", "/api/jobs/cancel":
                 self._json({"cancelled": jobs.cancel()})
             case _:
-                raise ApiError(HTTPStatus.NOT_FOUND, "Not found")
+                raise ApiError(HTTPStatus.NOT_FOUND, _("Not found"))
 
 
 def create_server(

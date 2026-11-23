@@ -18,6 +18,7 @@ import re
 import threading
 import time
 from dataclasses import asdict, dataclass, field
+from gettext import gettext as _
 from typing import Any, Final
 from urllib.parse import quote
 
@@ -329,7 +330,7 @@ def suggest_price(
     """
     search_query = (query or "").strip() or build_query(title or "")
     if not search_query:
-        raise ValueError("A title or search query is required")
+        raise ValueError(_("A title or search query is required"))
     category_id = search_category(category)
 
     attempts = [category_id, None] if category_id else [None]

@@ -329,3 +329,55 @@ def test_price_suggestion_reports_search_failures(base_url:str, monkeypatch:pyte
     status, body = call(base_url, "GET", "/api/price-suggestion?title=Sofa%20grau%20gemuetlich")
     assert status == 502
     assert "offline" in body["error"]
+
+
+def test_config_schema_and_effective_values(base_url:str) -> None:
+    status, schema = call(base_url, "GET", "/api/config/schema")
+    assert status == 200
+    assert "login" in schema["properties"]
+    status, values = call(base_url, "GET", "/api/config/values")
+    assert status == 200
+    assert values["login"]["username"] == "user@example.com"
+    assert values["ad_defaults"]["contact"]["zipcode"] == 12345
+    assert values["ad_defaults"]["republication_interval"] == 7  # default, not in the file
+
+
+def test_config_values_keep_env_placeholders_unresolved(base_url:str, workspace:Path, monkeypatch:pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KAB_TEST_PASSWORD", "resolved-secret")
+    (workspace / "config.yaml").write_text(CONFIG_YAML.replace('"secret"', '"${KAB_TEST_PASSWORD}"'), encoding = "utf-8")  # noqa: RUF027 literal placeholder
+    _, values = call(base_url, "GET", "/api/config/values")
+    assert values["login"]["password"] == "${KAB_TEST_PASSWORD}"  # noqa: RUF027, S105 literal placeholder, not a secret
+
+
+def test_config_changes_update_only_given_fields_and_keep_comments(base_url:str, workspace:Path) -> None:
+    (workspace / "config.yaml").write_text("# my config\n" + CONFIG_YAML, encoding = "utf-8")
+    status, body = call(base_url, "PUT", "/api/config/values", {"changes": [
+        {"path": ["login", "password"], "value": "new-secret"},
+        {"path": ["ad_defaults", "republication_interval"], "value": 14},
+        {"path": ["browser", "arguments"], "value": ["--lang=de"]},
+    ]})
+    assert status == 200, body
+    content = (workspace / "config.yaml").read_text(encoding = "utf-8")
+    assert content.startswith("# my config\n")
+    assert 'password: "new-secret"' in content  # existing quoting style is kept
+    assert "republication_interval: 14" in content
+    assert "--lang=de" in content
+    assert "timeouts" not in content  # defaults are not written out
+    _, values = call(base_url, "GET", "/api/config/values")
+    assert values["ad_defaults"]["republication_interval"] == 14
+
+
+@pytest.mark.parametrize("changes", [
+    [{"path": ["login", "username"], "value": ""}],
+    [{"path": ["ad_defaults", "price_type"], "value": "CHEAP"}],
+])
+def test_config_changes_are_validated(base_url:str, workspace:Path, changes:list[dict[str, Any]]) -> None:
+    status, _ = call(base_url, "PUT", "/api/config/values", {"changes": changes})
+    assert status == 422
+    assert (workspace / "config.yaml").read_text(encoding = "utf-8") == CONFIG_YAML
+
+
+@pytest.mark.parametrize("body", [{}, {"changes": []}, {"changes": [{"path": []}]}, {"changes": [{"path": ["a", 1]}]}])
+def test_config_changes_reject_malformed_requests(base_url:str, body:dict[str, Any]) -> None:
+    status, _ = call(base_url, "PUT", "/api/config/values", body)
+    assert status == 400
