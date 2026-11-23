@@ -71,7 +71,7 @@ Die Nutzung erfolgt auf eigenes Risiko. Jede rechtswidrige Verwendung ist unters
 Requirements: [Docker](https://www.docker.com/) with the Compose plugin and a [git client](https://git-scm.com/downloads).
 
 ```bash
-git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
+git clone https://github.com/kyamo/kleinanzeigen-bot.git
 cd kleinanzeigen-bot
 GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
@@ -230,7 +230,7 @@ Without Compose: `docker build -f docker/image/Dockerfile --build-arg GIT_COMMIT
 1. Clone the repo using
 
    ```bash
-   git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
+   git clone https://github.com/kyamo/kleinanzeigen-bot.git
    ```
 
 1. Change into the directory:
@@ -267,7 +267,7 @@ Without Compose: `docker build -f docker/image/Dockerfile --build-arg GIT_COMMIT
 1. Clone the repo using
 
    ```bash
-   git clone -b feat/web-ui https://github.com/kyamo/kleinanzeigen-bot.git
+   git clone https://github.com/kyamo/kleinanzeigen-bot.git
    ```
 
 1. Open the cloned directory in a Bash terminal window and navigate to the [docker](docker) subdirectory
