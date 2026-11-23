@@ -162,6 +162,15 @@ dialog .foot { padding: 14px 20px; border-top: 1px solid var(--border); display:
 .cfg-field.wide { grid-column: 1 / -1; }
 .pw { display: flex; gap: 6px; } .pw input { flex: 1; }
 .kv-row { display: flex; gap: 6px; margin-bottom: 6px; } .kv-row input { flex: 1; }
+.drop { border: 2px dashed var(--border); border-radius: 12px; padding: 22px; text-align: center; cursor: pointer; display: flex; flex-direction: column; gap: 4px; color: var(--muted); transition: border-color .15s, background .15s; }
+.drop b { color: var(--text); } .drop:hover, .drop:focus, .drop.over { border-color: var(--accent); background: var(--accent-soft); outline: none; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+.thumb-item { position: relative; aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
+.thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-item button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 15px; line-height: 26px; padding: 0; }
+.thumb-item .first { position: absolute; left: 4px; bottom: 4px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; }
+.thumb-item .size { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 99px; }
+.patterns { margin-top: 10px; } .patterns summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
 #toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
 .toast { background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow); max-width: 380px; font-size: 14px; }
 .toast.error { background: var(--danger); color: #fff; }
@@ -245,7 +254,18 @@ dialog .foot { padding: 14px 20px; border-top: 1px solid var(--border); display:
           <option value="SHIPPING" data-i18n="st.SHIPPING">Versand möglich</option>
           <option value="NOT_APPLICABLE" data-i18n="st.NOT_APPLICABLE">Keine Angabe</option>
         </select></div>
-      <div class="full"><label for="f-images" data-i18n="f.images">Bilder (ein Pfad oder Muster pro Zeile)</label><textarea id="f-images" name="images" rows="3" style="min-height:70px" placeholder="*.jpg"></textarea><div class="hint" data-i18n="f.imagesHint">Relativ zum Ordner der Anzeige, z. B. „*.jpg“ – lege die Bilder einfach in den neuen Ordner.</div></div>
+      <div class="full"><label data-i18n="f.images">Bilder</label>
+        <div class="drop" id="dropZone" tabindex="0" role="button" aria-describedby="dropHint">
+          <b data-i18n="f.dropTitle">Bilder hierher ziehen oder klicken zum Auswählen</b>
+          <span id="dropHint" data-i18n="f.dropHint">JPG, PNG oder GIF · bis zu 20 Bilder · max. 25 MB je Bild · das erste Bild ist das Titelbild</span>
+        </div>
+        <input type="file" id="f-files" accept=".jpg,.jpeg,.png,.gif,image/jpeg,image/png,image/gif" multiple hidden>
+        <div class="thumbs" id="thumbs"></div>
+        <details class="patterns"><summary data-i18n="f.patterns">Bilder stattdessen per Dateimuster einbinden (für Fortgeschrittene)</summary>
+          <textarea id="f-images" name="images" rows="2" style="min-height:60px" placeholder="*.jpg"></textarea>
+          <div class="hint" data-i18n="f.imagesHint">Ein Pfad oder Muster pro Zeile, relativ zum Ordner der Anzeige, z. B. „*.jpg“.</div>
+        </details>
+      </div>
       <div class="full row">
         <label class="switch"><input type="checkbox" name="active" checked> <span data-i18n="f.active">Aktiv</span></label>
         <button class="btn primary" type="submit" data-i18n="new.save">Anzeige speichern</button>
@@ -332,8 +352,10 @@ const EN = {
   "sel.publish": "Publish", "sel.update": "Update", "sel.extend": "Extend", "sel.reserve": "Reserve", "sel.activate": "Re-activate", "sel.delete": "Delete online", "sel.clear": "Clear selection",
   "new.title": "Create new ad", "new.sub": "The ad is saved as a YAML file below “ads/” next to your configuration. Add more fields in the editor afterwards.", "new.save": "Save ad",
   "f.title": "Title", "f.titleHint": "10–65 characters", "f.description": "Description", "f.price": "Price (€)", "f.priceType": "Price type", "f.default": "Default from configuration",
-  "f.category": "Category", "f.categoryHint": "Name from the list or an ID, e.g. 161/176/sonstige", "f.shipping": "Shipping", "f.images": "Images (one path or pattern per line)",
-  "f.imagesHint": "Relative to the ad folder, e.g. “*.jpg” – just drop the images into the new folder.", "f.active": "Active",
+  "f.category": "Category", "f.categoryHint": "Name from the list or an ID, e.g. 161/176/sonstige", "f.shipping": "Shipping", "f.images": "Images",
+  "f.imagesHint": "One path or pattern per line, relative to the ad folder, e.g. “*.jpg”.", "f.active": "Active",
+  "f.dropTitle": "Drag images here or click to choose", "f.dropHint": "JPG, PNG or GIF · up to 20 images · max. 25 MB each · the first image is the cover",
+  "f.patterns": "Include images by file pattern instead (advanced)",
   "pt.FIXED": "Fixed price", "pt.NEGOTIABLE": "Negotiable", "pt.GIVE_AWAY": "Give away", "pt.NOT_APPLICABLE": "Not specified",
   "st.PICKUP": "Pickup only", "st.SHIPPING": "Shipping possible", "st.NOT_APPLICABLE": "Not specified",
   "jobs.title": "Actions & log", "jobs.sub": "Runs bot commands. Browser actions open the configured Chrome/Edge window on this computer.", "jobs.options": "Options",
@@ -358,6 +380,8 @@ const DE_EXTRA = {
   "sec.timeouts": "Zeitlimits|Wartezeiten in Sekunden", "sec.humanization": "Menschliches Verhalten|Tipp- und Klickverzögerungen",
   "sec.diagnostics": "Diagnose|Fehleranalyse", "sec.categories": "Eigene Kategorien|Zusätzliche Zuordnungen Name → Kategorie-ID",
   "sec.ad_files": "Anzeigendateien|Suchmuster für Anzeigendateien",
+  "img.cover": "Titelbild", "img.remove": "Entfernen", "img.badType": "{f}: nur JPG, PNG oder GIF möglich", "img.tooBig": "{f}: größer als 25 MB",
+  "img.tooMany": "Höchstens 20 Bilder pro Anzeige", "img.uploading": "Lade Bild {i} von {n} hoch …", "img.failed": "Die Anzeige wurde angelegt, aber nicht alle Bilder konnten hochgeladen werden:",
   "ps.button": "Preisvorschlag", "ps.title": "Preisvorschlag: {t}", "ps.loading": "Suche vergleichbare Angebote auf kleinanzeigen.de …",
   "ps.suggested": "Empfohlener Preis", "ps.quick": "Schneller Verkauf", "ps.range": "Übliche Spanne", "ps.minmax": "Min – Max",
   "ps.basis": "Basis: {n} vergleichbare Angebote{c}", "ps.inCat": " in der Kategorie", "ps.allCats": " (alle Kategorien)",
@@ -388,6 +412,8 @@ const DE_EXTRA = {
   "cmd.update-check": "Update-Check|Nach neuer Version suchen",
 };
 const EN_EXTRA = {
+  "img.cover": "Cover", "img.remove": "Remove", "img.badType": "{f}: only JPG, PNG or GIF are supported", "img.tooBig": "{f}: larger than 25 MB",
+  "img.tooMany": "At most 20 images per ad", "img.uploading": "Uploading image {i} of {n} …", "img.failed": "The ad was created, but not all images could be uploaded:",
   "type.OFFER": "Offer", "type.WANTED": "Wanted",
   "cfg.kvName": "Name", "cfg.kvId": "ID, e.g. 161/176/sonstige", "cfg.on": "on", "cfg.off": "off",
   "cfg.changes": "{n} unsaved change(s)", "cfg.saved": "Configuration saved", "cfg.show": "Show", "cfg.hide": "Hide",
@@ -711,18 +737,69 @@ async function loadCategories() {
     categoriesLoaded = true;
   } catch (e) { /* config errors are shown elsewhere */ }
 }
+// ---- images for a new ad ----
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
+const MAX_IMAGES = 20, MAX_IMAGE_MB = 25;
+let newImages = [];  // [{file, url}]
+function renderThumbs() {
+  $("#thumbs").replaceChildren(...newImages.map((img, i) => el("div", { class: "thumb-item" },
+    el("img", { src: img.url, alt: img.file.name, title: img.file.name }),
+    i === 0 ? el("span", { class: "first" }, t("img.cover")) : null,
+    el("span", { class: "size" }, img.file.size < 1024 * 1024 ? Math.max(1, Math.round(img.file.size / 1024)) + " KB" : (img.file.size / 1024 / 1024).toFixed(1) + " MB"),
+    el("button", { type: "button", title: t("img.remove"), "aria-label": t("img.remove"), onclick: () => { URL.revokeObjectURL(img.url); newImages.splice(i, 1); renderThumbs(); } }, "×"))));
+}
+function addImages(files) {
+  const problems = [];
+  for (const file of files) {
+    if (!IMAGE_TYPES.includes(file.type)) { problems.push(t("img.badType", { f: file.name })); continue; }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) { problems.push(t("img.tooBig", { f: file.name })); continue; }
+    if (newImages.length >= MAX_IMAGES) { problems.push(t("img.tooMany")); break; }
+    newImages.push({ file, url: URL.createObjectURL(file) });
+  }
+  $("#newMsg").textContent = problems.join("\n");
+  renderThumbs();
+}
+function clearImages() { newImages.forEach(img => URL.revokeObjectURL(img.url)); newImages = []; renderThumbs(); }
+const dropZone = $("#dropZone");
+dropZone.addEventListener("click", () => $("#f-files").click());
+dropZone.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#f-files").click(); } });
+$("#f-files").addEventListener("change", e => { addImages([...e.target.files]); e.target.value = ""; });
+["dragenter", "dragover"].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove("over")));
+dropZone.addEventListener("drop", e => { e.preventDefault(); addImages([...e.dataTransfer.files]); });
+
+async function uploadImage(adFile, file) {
+  const res = await fetch("/api/ad/image?" + new URLSearchParams({ file: adFile, name: file.name }), {
+    method: "POST", body: file,
+    headers: { "X-Requested-With": "kleinanzeigen-bot", "X-UI-Lang": LANG, "Content-Type": file.type || "application/octet-stream" },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(file.name + ": " + (data.error || res.statusText));
+  return data;
+}
+
 $("#newForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const fd = new FormData(e.target);
-  const body = Object.fromEntries(fd.entries());
+  const form = e.target, submit = form.querySelector("[type=submit]"), msg = $("#newMsg");
+  const fd = new FormData(form);
+  const body = Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string"));
   body.active = fd.has("active");
-  $("#newMsg").textContent = "";
+  msg.className = "full msg"; msg.textContent = "";
+  submit.disabled = true;
   try {
     const res = await api("POST", "/api/ads", body);
+    const failed = [];
+    for (const [i, img] of newImages.entries()) {
+      msg.className = "full msg good"; msg.textContent = t("img.uploading", { i: i + 1, n: newImages.length });
+      try { await uploadImage(res.file, img.file); } catch (err) { failed.push(err.message); }
+    }
     toast(t("toast.created", { f: res.file }));
-    e.target.reset();
-    await loadAds(); show("ads");
-  } catch (err) { $("#newMsg").textContent = err.message; }
+    form.reset(); clearImages(); $("#f-suggest-info").textContent = "";
+    await loadAds();
+    if (failed.length) { msg.className = "full msg"; msg.textContent = t("img.failed") + "\n" + failed.join("\n"); return; }
+    msg.textContent = ""; show("ads");
+  } catch (err) { msg.className = "full msg"; msg.textContent = err.message; }
+  finally { submit.disabled = false; }
 });
 
 // ---- config ----

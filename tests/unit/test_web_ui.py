@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Any
 
@@ -399,3 +400,81 @@ def test_backslash_paths_from_windows_are_normalized(base_url:str, monkeypatch:p
     assert status == 200
     status, _ = call(base_url, "GET", "/api/ad?file=ads/../ads/ad_bike.yaml")
     assert status == 200
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+
+
+def upload(base_url:str, ad_file:str, name:str, data:bytes) -> tuple[int, Any]:
+    query = urllib.parse.urlencode({"file": ad_file, "name": name})
+    return call_raw(base_url, f"/api/ad/image?{query}", data)
+
+
+def call_raw(base_url:str, path:str, data:bytes) -> tuple[int, Any]:
+    request = urllib.request.Request(base_url + path, data = data, method = "POST", headers = {  # noqa: S310 loopback test server
+        "X-Requested-With": "kleinanzeigen-bot", "Content-Type": "application/octet-stream"})
+    try:
+        with urllib.request.urlopen(request, timeout = 30) as response:  # noqa: S310 loopback test server
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as ex:
+        return ex.code, json.loads(ex.read())
+
+
+def test_image_upload_stores_file_and_references_it(base_url:str, workspace:Path) -> None:
+    status, body = upload(base_url, "./ads/ad_bike.yaml", "IMG 0001.JPG", JPG)
+    assert status == 201, body
+    assert body == {"image": "ads/img_0001.jpg"}
+    assert (workspace / "ads" / "img_0001.jpg").read_bytes() == JPG
+    status, body = upload(base_url, "./ads/ad_bike.yaml", "IMG 0001.JPG", JPG)
+    assert body == {"image": "ads/img_0001_2.jpg"}  # existing files are never overwritten
+    content = (workspace / "ads" / "ad_bike.yaml").read_text(encoding = "utf-8")
+    assert "img_0001.jpg" in content
+    assert "img_0001_2.jpg" in content
+    _, listing = call(base_url, "GET", "/api/ads")
+    bike = next(ad for ad in listing["ads"] if ad["file"] == "./ads/ad_bike.yaml")
+    assert bike["images"] == ["ads/img_0001.jpg", "ads/img_0001_2.jpg"]
+
+
+def test_image_upload_covered_by_existing_pattern_is_not_added_twice(base_url:str, workspace:Path) -> None:
+    status, _ = upload(base_url, "./ads/sofa/ad_sofa.yaml", "back.png", PNG)
+    assert status == 201
+    assert (workspace / "ads" / "sofa" / "back.png").exists()
+    assert (workspace / "ads" / "sofa" / "ad_sofa.yaml").read_text(encoding = "utf-8") == SOFA_YAML  # "*.png" already covers it
+
+
+@pytest.mark.parametrize(("name", "data", "expected_status"), [
+    ("photo.webp", b"RIFF\x00\x00\x00\x00WEBPVP8 ", 415),
+    ("fake.jpg", b"<html>not an image</html>", 415),
+    ("empty.png", b"", 400),
+])
+def test_image_upload_rejects_unsupported_data(base_url:str, workspace:Path, name:str, data:bytes, expected_status:int) -> None:
+    status, _ = upload(base_url, "./ads/ad_bike.yaml", name, data)
+    assert status == expected_status
+    assert not list((workspace / "ads").glob("*.jp*g"))
+    assert not list((workspace / "ads").glob("*.webp"))
+
+
+def test_image_upload_enforces_image_limit_and_known_ads(base_url:str, workspace:Path) -> None:
+    for i in range(web_ui.MAX_IMAGES_PER_AD - 1):  # front.png already exists
+        (workspace / "ads" / "sofa" / f"extra{i}.png").write_bytes(PNG)
+    status, body = upload(base_url, "./ads/sofa/ad_sofa.yaml", "one-more.png", PNG)
+    assert status == 422
+    assert str(web_ui.MAX_IMAGES_PER_AD) in body["error"]
+    status, _ = upload(base_url, "../secret.txt", "x.png", PNG)
+    assert status == 404
+
+
+def test_image_upload_requires_same_origin_header(base_url:str) -> None:
+    query = urllib.parse.urlencode({"file": "./ads/ad_bike.yaml", "name": "x.png"})
+    request = urllib.request.Request(f"{base_url}/api/ad/image?{query}", data = PNG, method = "POST")  # noqa: S310 loopback test server
+    with pytest.raises(urllib.error.HTTPError) as exc_info:
+        urllib.request.urlopen(request, timeout = 30)  # noqa: S310 loopback test server
+    assert exc_info.value.code == 403
+
+
+def test_index_csp_allows_local_image_previews(base_url:str) -> None:
+    with urllib.request.urlopen(base_url + "/", timeout = 30) as response:  # noqa: S310 loopback test server
+        csp = response.headers["Content-Security-Policy"]
+    assert "img-src 'self' data: blob:" in csp  # previews of selected files use blob: URLs
+    assert "frame-ancestors 'none'" in csp

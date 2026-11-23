@@ -79,11 +79,12 @@ GIT_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose up -d --build
 1. Open the web interface at <http://localhost:8090>.
 1. Go to **Configuration**, enter your kleinanzeigen.de login (`login.username`, `login.password`) and your contact
    (`ad_defaults.contact.name`, `ad_defaults.contact.zipcode`), then save.
-1. Go to **Actions & log** and run **Download** to fetch your existing ads, or create one under **New ad**.
+1. Go to **Actions & log** and run **Download** to fetch your existing ads, or create one under **New ad** and upload
+   its photos right there.
 1. When a command needs your attention (CAPTCHA, SMS code), open the browser desktop at <http://localhost:6080>
    (login `user`, password in `./data/.vnc-password`) to see the bot's browser.
 
-Config, ads, images and the browser profile are stored in `./data`. Put the images of an ad into its folder
+Config, ads, images and the browser profile are stored in `./data`; uploaded images end up in the ad's folder
 (`./data/ads/<title>/`). Update later with `git pull` and the same `docker compose up -d --build` command;
 stop with `docker compose down`. See [Web interface in Docker](#web-ui-docker) for details.
 
@@ -406,7 +407,8 @@ config and ad files as the CLI:
 - **Ads**: card overview of all local ads with images, price, status (new / changed / due / online / disabled),
   search, filters and sorting; edit the YAML of an ad with validation, enable/disable ads, and select published ads
   to publish, update, extend, reserve, re-activate or delete them
-- **New ad**: form with category auto-completion that creates `ads/<title>/ad_<title>.yaml` next to the config
+- **New ad**: form with category auto-completion and image upload (drag & drop, JPG/PNG/GIF, up to 20 images,
+  the first one is the cover) that creates `ads/<title>/ad_<title>.yaml` with its images next to the config
 - **Actions & log**: run any bot command (`verify`, `publish`, `update`, `download`, `extend`, …) with live log output,
   cancel it and see the history of recent runs
 - **Configuration**: all options as a form with descriptions and defaults, grouped by topic and validated before saving;

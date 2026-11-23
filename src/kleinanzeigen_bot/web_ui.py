@@ -70,6 +70,15 @@ JOB_COMMANDS:Final[frozenset[str]] = frozenset({
 })
 _MAX_LOG_LINES:Final[int] = 5000
 _MAX_BODY_BYTES:Final[int] = 2 * 1024 * 1024
+_MAX_IMAGE_BYTES:Final[int] = 25 * 1024 * 1024
+MAX_IMAGES_PER_AD:Final[int] = 20  # kleinanzeigen.de limit for private ads
+# Image types the bot can publish (see ad_loading.resolve_ad_images), detected by their file signature.
+_IMAGE_SIGNATURES:Final[tuple[tuple[bytes, str], ...]] = (
+    (b"\xff\xd8\xff", ".jpg"),
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"GIF87a", ".gif"),
+    (b"GIF89a", ".gif"),
+)
 _ADS_SELECTOR_PATTERN:Final[re.Pattern[str]] = re.compile(r"^[a-z0-9,\-]{1,500}$")
 _ANSI_PATTERN:Final[re.Pattern[str]] = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _IMAGE_SUFFIXES:Final[frozenset[str]] = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"})
@@ -255,13 +264,34 @@ def _path_key(path:str) -> str:
     return os.path.normcase(os.path.normpath(path))
 
 
+def detect_image_suffix(data:bytes) -> str | None:
+    r"""Return the file suffix for supported image data, ``None`` otherwise.
+
+    >>> detect_image_suffix(b"\x89PNG\r\n\x1a\n..."), detect_image_suffix(b"RIFF....WEBP")
+    ('.png', None)
+    """
+    return next((suffix for signature, suffix in _IMAGE_SIGNATURES if data.startswith(signature)), None)
+
+
+def image_file_name(original:str, suffix:str) -> str:
+    """Safe file name for an uploaded image, keeping the readable part of the original name.
+
+    >>> image_file_name("IMG 2024-05-01 (Kopie).JPEG", ".jpg"), image_file_name("../../etc/passwd", ".png"), image_file_name("äöü", ".gif")
+    ('img_2024-05-01_kopie.jpg', 'passwd.png', 'aou.gif')
+    """
+    stem = Path(original.replace("\\", "/")).stem
+    normalized = unicodedata.normalize("NFKD", stem.replace("ß", "ss")).encode("ascii", "ignore").decode("ascii")
+    clean = re.sub(r"[^a-z0-9-]+", "_", normalized.lower()).strip("_-")[:60]
+    return (clean or "image") + suffix
+
+
 def slugify(text:str) -> str:
     normalized = unicodedata.normalize("NFKD", text.replace("ß", "ss")).encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-z0-9]+", "_", normalized.lower()).strip("_")
     return slug[:50].rstrip("_") or "anzeige"
 
 
-class BotContext:
+class BotContext:  # noqa: PLR0904 one method per API endpoint
     """File-system facing operations used by the HTTP handler."""
 
     def __init__(self, config_file_path:str, workspace:_xdg_paths.Workspace | None) -> None:
@@ -556,6 +586,38 @@ class BotContext:
             )
         return {"file": rel}
 
+    def add_ad_image(self, rel:str, original_name:str, data:bytes) -> dict[str, str]:
+        """Store an uploaded image next to the ad file and reference it in the ad's ``images``."""
+        config = self.load_state().config
+        abs_path = self.resolve_ad_file(rel, config)
+        suffix = detect_image_suffix(data)
+        if suffix is None:
+            raise ApiError(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, _("Unsupported image format: %s (allowed: JPG, PNG, GIF)") % original_name)
+        ad_path = Path(abs_path)
+        raw = _parse_document(ad_path.read_text(encoding = "utf-8"), ad_path.suffix)
+        patterns = [str(item) for item in (raw.get("images") or [])] if isinstance(raw, dict) else []
+        current = ad_loading.resolve_ad_images(abs_path, patterns) if patterns else []
+        if len(current) >= MAX_IMAGES_PER_AD:
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("An ad can have at most %s images") % MAX_IMAGES_PER_AD)
+
+        name = image_file_name(original_name, suffix)
+        target = ad_path.parent / name
+        counter = 2
+        while target.exists():
+            target = ad_path.parent / f"{Path(name).stem}_{counter}{suffix}"
+            counter += 1
+        target.write_bytes(data)
+        try:
+            already_covered = bool(patterns) and str(target.resolve()) in {
+                str(Path(image).resolve()) for image in ad_loading.resolve_ad_images(abs_path, patterns)
+            }
+            if not already_covered:
+                self.set_ad_field(rel, "images", [*patterns, target.name])
+        except Exception:
+            target.unlink(missing_ok = True)
+            raise
+        return {"image": to_posix(os.path.relpath(target, self.config_dir))}
+
     def delete_ad_file(self, rel:str) -> None:
         abs_path = self.resolve_ad_file(rel)
         Path(abs_path).unlink()
@@ -632,6 +694,14 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
             raise ApiError(HTTPStatus.BAD_REQUEST, _("JSON body must be an object"))
         return data
 
+    def _raw_body(self, limit:int) -> bytes:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > limit:
+            raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, _("File too large (max. %s MB)") % (limit // (1024 * 1024)))
+        if length <= 0:
+            raise ApiError(HTTPStatus.BAD_REQUEST, _("Empty upload"))
+        return self.rfile.read(length)
+
     def _check_same_origin(self) -> None:
         """Block cross-site requests (CSRF / DNS rebinding) to state-changing endpoints."""
         if self.headers.get("X-Requested-With") != "kleinanzeigen-bot":
@@ -681,7 +751,7 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
         match method, path:
             case "GET", "/" | "/index.html":
                 self._send(HTTPStatus.OK, _static_file("index.html"), "text/html; charset=utf-8", {
-                    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                    "Content-Security-Policy": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "
                     "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'",
                     "X-Frame-Options": "DENY",
                 })
@@ -709,6 +779,9 @@ class WebUIRequestHandler(BaseHTTPRequestHandler):
                 body = self._body()
                 ctx.set_ad_active(str(body.get("file", "")), active = bool(body.get("active")))
                 self._json({"ok": True})
+            case "POST", "/api/ad/image":
+                result = ctx.add_ad_image(query.get("file", ""), query.get("name", "image"), self._raw_body(_MAX_IMAGE_BYTES))
+                self._json(result, HTTPStatus.CREATED)
             case "POST", "/api/ad/price":
                 body = self._body()
                 ctx.set_ad_price(str(body.get("file", "")), body.get("price"))

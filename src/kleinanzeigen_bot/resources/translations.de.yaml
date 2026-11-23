@@ -1376,6 +1376,12 @@ kleinanzeigen_bot/utils/xdg_paths.py:
 #################################################
 kleinanzeigen_bot/web_ui.py:
 #################################################
+  add_ad_image:
+    "Unsupported image format: %s (allowed: JPG, PNG, GIF)": "Nicht unterstütztes Bildformat: %s (erlaubt: JPG, PNG, GIF)"
+    "An ad can have at most %s images": "Eine Anzeige kann höchstens %s Bilder haben"
+  _raw_body:
+    "File too large (max. %s MB)": "Datei zu groß (max. %s MB)"
+    "Empty upload": "Leerer Upload"
   _body:
     "Invalid JSON body": "Ungültiger JSON-Inhalt"
     "JSON body must be an object": "Der JSON-Inhalt muss ein Objekt sein"
