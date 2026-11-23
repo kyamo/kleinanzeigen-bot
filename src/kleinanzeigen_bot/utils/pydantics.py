@@ -80,12 +80,37 @@ def format_validation_error(ex:ValidationError) -> str:
         code = err["type"]
         msg_template = __get_message_template(code)
         if msg_template:
-            msg = _(msg_template).format(**msg_ctx) if msg_ctx else msg_template
+            translated = _(msg_template)
+            if msg_ctx and "{expected_plural}" in translated and "expected_plural" not in msg_ctx:
+                msg_ctx = {**msg_ctx, "expected_plural": _expected_plural(translated, msg_ctx)}
+            msg = translated.format(**msg_ctx) if msg_ctx else msg_template
             msg = msg.replace("' or '", _("' or '"))
             lines.append(f"- {loc}: {msg}")
         else:
             lines.append(f"- {loc}: {err['msg']} [type={code}]")
     return "\n".join(lines)
+
+
+def _expected_plural(template:str, msg_ctx:dict[str, Any]) -> str:
+    """Plural suffix for length errors; pydantic omits ``expected_plural`` from ``errors(include_context=True)``.
+
+    >>> _expected_plural("String should have at least {min_length} character{expected_plural}", {"min_length": 1})
+    ''
+    >>> _expected_plural("String should have at least {min_length} character{expected_plural}", {"min_length": 10})
+    's'
+    >>> _expected_plural("{field_type} sollte mindestens {min_length} Element{expected_plural} haben", {"min_length": 2})
+    'e'
+    >>> _expected_plural("String sollte mindestens {min_length} Zeichen{expected_plural} haben", {"min_length": 2})
+    ''
+    """
+    count = msg_ctx.get("min_length", msg_ctx.get("max_length"))
+    if count == 1:
+        return ""
+    if "Element{expected_plural}" in template:
+        return "e"
+    if "Zeichen{expected_plural}" in template or "Byte{expected_plural}" in template:
+        return ""
+    return "s"
 
 
 # Mapping of pydantic error codes -> raw English message templates.

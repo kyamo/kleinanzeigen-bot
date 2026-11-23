@@ -225,6 +225,17 @@ class TestFormatValidationError:
         out = format_validation_error(ex)
         assert any(exp in out for exp in expected.split()), f"Expected '{expected}' in output: {out}"
 
+    @pytest.mark.parametrize(("min_length", "value", "expected"), [
+        (1, "", "String should have at least 1 character"),
+        (3, "ab", "String should have at least 3 characters"),
+    ])
+    def test_format_length_errors_without_crashing(self, min_length:int, value:str, expected:str) -> None:
+        """Real length errors lack ``expected_plural`` in their context; formatting must not raise KeyError."""
+        model = type("LengthModel", (BaseModel,), {"__annotations__": {"name": str}, "model_config": {"str_min_length": min_length}})
+        with pytest.raises(ValidationError) as exc_info:
+            model(name = value)
+        assert expected in format_validation_error(exc_info.value)
+
     def test_format_standard_validation_error(self) -> None:
         """Standard ValidationError produces expected string."""
         try:
