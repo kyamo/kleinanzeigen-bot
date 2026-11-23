@@ -381,3 +381,21 @@ def test_config_changes_are_validated(base_url:str, workspace:Path, changes:list
 def test_config_changes_reject_malformed_requests(base_url:str, body:dict[str, Any]) -> None:
     status, _ = call(base_url, "PUT", "/api/config/values", body)
     assert status == 400
+
+
+def test_backslash_paths_from_windows_are_normalized(base_url:str, monkeypatch:pytest.MonkeyPatch) -> None:
+    from kleinanzeigen_bot import ad_loading  # noqa: PLC0415 only needed here
+
+    original = ad_loading.discover_ad_files
+
+    def windows_style(config_file_path:str, ad_file_patterns:list[str]) -> dict[str, str]:
+        return {abs_path: rel.replace("/", "\\") for abs_path, rel in original(config_file_path, ad_file_patterns).items()}
+
+    monkeypatch.setattr(ad_loading, "discover_ad_files", windows_style)
+    _, body = call(base_url, "GET", "/api/ads")
+    assert "./ads/ad_bike.yaml" in [ad["file"] for ad in body["ads"]]
+    assert [err["file"] for err in body["errors"]] == ["./ads/ad_broken.yaml"]
+    status, _ = call(base_url, "POST", "/api/ad/active", {"file": "./ads/ad_bike.yaml", "active": False})
+    assert status == 200
+    status, _ = call(base_url, "GET", "/api/ad?file=ads/../ads/ad_bike.yaml")
+    assert status == 200

@@ -241,6 +241,20 @@ def _parse_document(text:str, suffix:str) -> Any:
         raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, _("Syntax error: %s") % ex) from ex
 
 
+def to_posix(path:str) -> str:
+    r"""Use forward slashes for paths shown to and sent back by the browser.
+
+    >>> to_posix("./ads" + "\\" + "sofa.yaml")
+    './ads/sofa.yaml'
+    """
+    return path.replace("\\", "/")
+
+
+def _path_key(path:str) -> str:
+    """Comparable form of a path (resolves ``.``/``..``, separators and case on Windows)."""
+    return os.path.normcase(os.path.normpath(path))
+
+
 def slugify(text:str) -> str:
     normalized = unicodedata.normalize("NFKD", text.replace("ß", "ss")).encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-z0-9]+", "_", normalized.lower()).strip("_")
@@ -336,13 +350,15 @@ class BotContext:
     # -- ads ----------------------------------------------------------------
 
     def _ad_files(self, config:Config) -> dict[str, str]:
-        return ad_loading.discover_ad_files(self.config_file_path, config.ad_files)
+        """Known ad files as ``{absolute path: relative path with forward slashes}`` (stable across platforms)."""
+        return {abs_path: to_posix(rel_path) for abs_path, rel_path in ad_loading.discover_ad_files(self.config_file_path, config.ad_files).items()}
 
     def resolve_ad_file(self, rel:str, config:Config | None = None) -> str:
         """Map a relative ad path from the client to a known ad file (no arbitrary paths)."""
         cfg = config or self.load_state().config
-        for abs_path, rel_path in self._ad_files(cfg).items():
-            if rel in {rel_path, abs_path}:
+        wanted = _path_key(rel if os.path.isabs(rel) else os.path.join(self.config_dir, rel))
+        for abs_path in self._ad_files(cfg):
+            if _path_key(abs_path) == wanted:
                 return abs_path
         raise ApiError(HTTPStatus.NOT_FOUND, _("Unknown ad file: %s") % rel)
 
@@ -402,7 +418,7 @@ class BotContext:
             "category": category_name,
             "category_id": category_id,
             "shipping_type": ad.shipping_type,
-            "images": [os.path.relpath(img, self.config_dir) for img in images],
+            "images": [to_posix(os.path.relpath(img, self.config_dir)) for img in images],
             "image_count": len(images),
             "problems": problems,
             "created_on": raw_plain.get("created_on"),
@@ -532,7 +548,7 @@ class BotContext:
             + buffer.getvalue(),
             encoding = "utf-8",
         )
-        rel = os.path.relpath(target, self.config_dir)
+        rel = to_posix(os.path.relpath(target, self.config_dir))
         if abspath(str(target)) not in self._ad_files(config):
             raise ApiError(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
